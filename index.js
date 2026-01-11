@@ -140,8 +140,35 @@ mongoose
     retryWrites: true,
     w: 'majority',
   })
-  .then(() => {
+  .then(async () => {
     console.log('✅ MongoDB connected');
+    
+    // Migration: Drop old unique index on addresses.userId if it exists
+    try {
+      const Address = require('./model/address');
+      const indexes = await Address.collection.getIndexes();
+      
+      // Find unique index on userId
+      const userIdUniqueIndex = Object.keys(indexes).find(indexName => {
+        const index = indexes[indexName];
+        return index.key && index.key.userId === 1 && index.unique === true;
+      });
+      
+      if (userIdUniqueIndex) {
+        console.log('🔄 Dropping old unique index on addresses.userId...');
+        await Address.collection.dropIndex(userIdUniqueIndex);
+        console.log('✅ Old unique index dropped successfully');
+        
+        // Ensure non-unique index exists
+        await Address.collection.createIndex({ userId: 1 }, { unique: false });
+        console.log('✅ New non-unique index created');
+      }
+    } catch (migrationError) {
+      // Ignore if collection doesn't exist or index already dropped
+      if (migrationError.code !== 26 && migrationError.code !== 27) {
+        console.log('⚠️ Index migration note:', migrationError.message);
+      }
+    }
   })
   .catch((err) => {
     console.error('❌ MongoDB connection failed:', err.message);

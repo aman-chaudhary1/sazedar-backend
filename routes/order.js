@@ -2,6 +2,7 @@ const express = require('express');
 const asyncHandler = require('express-async-handler');
 const router = express.Router();
 const Order = require('../model/order');
+const auth = require('../middleware/authMiddleware');
 
 // Get all orders
 router.get('/', asyncHandler(async (req, res) => {
@@ -62,7 +63,62 @@ router.post('/', asyncHandler(async (req, res) => {
     }
 }));
 
-// Update an order
+// Cancel order by user (MUST be before PUT /:id route)
+router.put('/cancel/:id', auth, asyncHandler(async (req, res) => {
+    try {
+        const orderID = req.params.id;
+        const userId = req.user._id;
+
+        // Find order and verify ownership
+        const order = await Order.findOne({
+            _id: orderID,
+            userID: userId
+        });
+
+        if (!order) {
+            return res.status(404).json({ 
+                success: false, 
+                message: "Order not found or you don't have permission to cancel this order." 
+            });
+        }
+
+        // Check if order can be cancelled
+        if (order.orderStatus === 'cancelled') {
+            return res.status(400).json({ 
+                success: false, 
+                message: "Order is already cancelled." 
+            });
+        }
+
+        // Only delivered orders cannot be cancelled (pending, processing, and shipped can be cancelled)
+        if (order.orderStatus === 'delivered') {
+            return res.status(400).json({ 
+                success: false, 
+                message: "Cannot cancel order. Order is already delivered." 
+            });
+        }
+
+        // Update order status to cancelled
+        order.orderStatus = 'cancelled';
+        await order.save();
+
+        res.json({ 
+            success: true, 
+            message: "Order cancelled successfully.", 
+            data: order 
+        });
+    } catch (error) {
+        if (error.name === 'CastError') {
+            return res.status(400).json({ 
+                success: false, 
+                message: "Invalid order ID." 
+            });
+        }
+        res.status(500).json({ success: false, message: error.message });
+    }
+}));
+
+// Update an order (Admin endpoint - for updating status)
 router.put('/:id', asyncHandler(async (req, res) => {
     try {
         const orderID = req.params.id;

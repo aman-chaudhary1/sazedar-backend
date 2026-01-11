@@ -225,22 +225,7 @@ router.post('/login', asyncHandler(async (req, res) => {
     }
 }));
 
-
-// Get a user by ID
-router.get('/:id', asyncHandler(async (req, res) => {
-    try {
-        const userID = req.params.id;
-        const user = await User.findById(userID);
-        if (!user) {
-            return res.status(404).json({ success: false, message: "User not found." });
-        }
-        res.json({ success: true, message: "User retrieved successfully.", data: user });
-    } catch (error) {
-        res.status(500).json({ success: false, message: error.message });
-    }
-}));
-
-// Get user profile with orders, cart, favorites, and address
+// Get user profile with orders, cart, favorites, and address (MUST be before /:id route)
 router.get('/profile', auth, asyncHandler(async (req, res) => {
     try {
         const userId = req.user._id;
@@ -254,8 +239,9 @@ router.get('/profile', auth, asyncHandler(async (req, res) => {
             .populate('items.productID', 'name price offerPrice images')
             .sort({ _id: -1 });
 
-        // Get user address
-        const address = await Address.findOne({ userId: userId });
+        // Get user addresses (multiple addresses support)
+        const addresses = await Address.find({ userId: userId })
+            .sort({ isDefault: -1, createdAt: -1 });
 
         // Get user cart
         const Cart = require('../model/cart');
@@ -278,9 +264,23 @@ router.get('/profile', auth, asyncHandler(async (req, res) => {
                 orders: orders || [],
                 cart: cart,
                 favorites: favorites || [],
-                address: address || null
+                addresses: addresses || []
             }
         });
+    } catch (error) {
+        res.status(500).json({ success: false, message: error.message });
+    }
+}));
+
+// Get a user by ID (MUST be after /profile route)
+router.get('/:id', asyncHandler(async (req, res) => {
+    try {
+        const userID = req.params.id;
+        const user = await User.findById(userID);
+        if (!user) {
+            return res.status(404).json({ success: false, message: "User not found." });
+        }
+        res.json({ success: true, message: "User retrieved successfully.", data: user });
     } catch (error) {
         res.status(500).json({ success: false, message: error.message });
     }
