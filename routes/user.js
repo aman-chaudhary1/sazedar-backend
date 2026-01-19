@@ -389,6 +389,74 @@ router.put('/profile', auth, (req, res, next) => {
     }
 }));
 
+// Change Password
+router.put('/change-password', auth, asyncHandler(async (req, res) => {
+    try {
+        const { oldPassword, newPassword } = req.body;
+
+        // Validation
+        if (!oldPassword || !newPassword) {
+            return res.status(400).json({ 
+                success: false, 
+                message: "Old password and new password are required." 
+            });
+        }
+
+        if (newPassword.length < 6) {
+            return res.status(400).json({ 
+                success: false, 
+                message: "New password must be at least 6 characters long." 
+            });
+        }
+
+        // Get user with password
+        const user = await User.findById(req.user._id);
+
+        if (!user) {
+            return res.status(404).json({ 
+                success: false, 
+                message: "User not found." 
+            });
+        }
+
+        // Verify old password
+        const isOldPasswordValid = await bcrypt.compare(oldPassword, user.password);
+        if (!isOldPasswordValid) {
+            return res.status(400).json({ 
+                success: false, 
+                message: "Old password is incorrect." 
+            });
+        }
+
+        // Check if new password is same as old password
+        const isSamePassword = await bcrypt.compare(newPassword, user.password);
+        if (isSamePassword) {
+            return res.status(400).json({ 
+                success: false, 
+                message: "New password must be different from old password." 
+            });
+        }
+
+        // Hash new password
+        const salt = await bcrypt.genSalt(10);
+        const hashedNewPassword = await bcrypt.hash(newPassword, salt);
+
+        // Update password
+        user.password = hashedNewPassword;
+        await user.save();
+
+        res.json({ 
+            success: true, 
+            message: "Successfully changed password",
+            data: {
+                message: "Password has been changed successfully"
+            }
+        });
+    } catch (error) {
+        res.status(500).json({ success: false, message: error.message });
+    }
+}));
+
 // Delete a user
 router.delete('/:id', asyncHandler(async (req, res) => {
     try {
