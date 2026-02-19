@@ -2,6 +2,7 @@ const express = require('express');
 const asyncHandler = require('express-async-handler');
 const router = express.Router();
 const User = require('../model/user');
+const OTP = require('../model/otp');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const auth = require('../middleware/authMiddleware');
@@ -10,6 +11,7 @@ const Address = require('../model/address');
 const multer = require('multer');
 const { uploadUserProfile } = require('../uploadFile');
 const cloudinary = require('../config/cloudinary');
+const { sendOtpEmail } = require('../utility/emailService');
 
 // Get all users
 router.get('/', asyncHandler(async (req, res) => {
@@ -21,10 +23,48 @@ router.get('/', asyncHandler(async (req, res) => {
     }
 }));
 
-// User Signup/Register with profile image
+// Send OTP for Registration
+router.post('/send-otp', asyncHandler(async (req, res) => {
+    const { email } = req.body;
+
+    if (!email) {
+        return res.status(400).json({ success: false, message: "Email is required." });
+    }
+
+    try {
+        // Check if user already exists
+        const existingUser = await User.findOne({ email });
+        if (existingUser) {
+            return res.status(400).json({ success: false, message: "User with this email already exists." });
+        }
+
+        // Generate 6-digit OTP
+        const otpCodes = Math.floor(100000 + Math.random() * 900000).toString();
+
+        // Save OTP to database (upsert: update if exists, insert if not)
+        await OTP.findOneAndUpdate(
+            { email },
+            { otp: otpCodes, createdAt: Date.now() },
+            { upsert: true, new: true, setDefaultsOnInsert: true }
+        );
+
+        // Send OTP via email
+        const emailSent = await sendOtpEmail(email, otpCodes);
+
+        if (emailSent) {
+            res.json({ success: true, message: "OTP sent successfully to your email." });
+        } else {
+            res.status(500).json({ success: false, message: "Failed to send OTP email." });
+        }
+    } catch (error) {
+        res.status(500).json({ success: false, message: error.message });
+    }
+}));
+
+// User Signup/Register with profile image and OTP Verification
 router.post('/register', (req, res, next) => {
     const contentType = req.headers['content-type'] || '';
-    
+
     // Only use multer if it's multipart/form-data
     if (contentType.includes('multipart/form-data')) {
         // Use any() to accept any file fields - more permissive
@@ -52,16 +92,16 @@ router.post('/register', (req, res, next) => {
             if (req.files) {
                 // Debug: Log what we received
                 console.log('📁 req.files type:', Array.isArray(req.files) ? 'Array' : typeof req.files);
-                console.log('📁 req.files content:', Array.isArray(req.files) 
+                console.log('📁 req.files content:', Array.isArray(req.files)
                     ? req.files.map(f => ({ fieldname: f.fieldname, originalname: f.originalname }))
                     : Object.keys(req.files));
-                
+
                 let profileImageFile = null;
-                
+
                 // Handle array format (from .any())
                 if (Array.isArray(req.files) && req.files.length > 0) {
                     // Try to find exact match first (trim to handle tab/whitespace issues)
-                    profileImageFile = req.files.find(file => 
+                    profileImageFile = req.files.find(file =>
                         file.fieldname && file.fieldname.trim() === 'profileImage'
                     );
                     // If not found, use first file
@@ -69,18 +109,18 @@ router.post('/register', (req, res, next) => {
                         profileImageFile = req.files[0];
                         console.log('⚠️ Using first file as profileImage (fieldname:', profileImageFile.fieldname.trim(), ')');
                     }
-                } 
+                }
                 // Handle object format (from .fields() or .single())
                 else if (req.files.profileImage) {
-                    profileImageFile = Array.isArray(req.files.profileImage) 
-                        ? req.files.profileImage[0] 
+                    profileImageFile = Array.isArray(req.files.profileImage)
+                        ? req.files.profileImage[0]
                         : req.files.profileImage;
                 }
                 // Handle single file format
                 else if (req.file) {
                     profileImageFile = req.file;
                 }
-                
+
                 if (profileImageFile) {
                     req.file = profileImageFile;
                     console.log('✅ Profile image extracted:', req.file.originalname, req.file.mimetype, (req.file.size / 1024).toFixed(2) + 'KB');
@@ -98,13 +138,21 @@ router.post('/register', (req, res, next) => {
         next();
     }
 }, asyncHandler(async (req, res) => {
-    const { name, email, password, phoneNo } = req.body;
-    
-    if (!name || !email || !password) {
-        return res.status(400).json({ success: false, message: "Name, email, and password are required." });
+    // Note: 'otp' can be in req.body.otp or req.query.otp depending on how frontend sends it with FormData
+    // Since it's multipart/form-data, it should be in req.body
+    const { name, email, password, phoneNo, otp } = req.body;
+
+    if (!name || !email || !password || !otp) {
+        return res.status(400).json({ success: false, message: "Name, email, password, and OTP are required." });
     }
 
     try {
+        // Verify OTP
+        const existingOtp = await OTP.findOne({ email });
+        if (!existingOtp || existingOtp.otp !== otp) {
+            return res.status(400).json({ success: false, message: "Invalid or expired OTP." });
+        }
+
         // Check if user already exists
         const existingUser = await User.findOne({ email });
         if (existingUser) {
@@ -137,16 +185,19 @@ router.post('/register', (req, res, next) => {
         }
 
         // Create new user
-        const user = new User({ 
-            name, 
-            email, 
+        const user = new User({
+            name,
+            email,
             password: hashedPassword,
             phoneNo: phoneNo || null,
             profileImage: profileImageUrl
         });
-        
+
         const newUser = await user.save();
-        
+
+        // Delete valid OTP
+        await OTP.deleteOne({ email });
+
         // Generate JWT token
         const token = jwt.sign(
             { id: newUser._id },
@@ -154,9 +205,9 @@ router.post('/register', (req, res, next) => {
             { expiresIn: '30d' }
         );
 
-        res.json({ 
-            success: true, 
-            message: "User created successfully.", 
+        res.json({
+            success: true,
+            message: "User created successfully.",
             data: {
                 user: {
                     id: newUser._id,
@@ -206,8 +257,8 @@ router.post('/login', asyncHandler(async (req, res) => {
         );
 
         // Authentication successful
-        res.status(200).json({ 
-            success: true, 
+        res.status(200).json({
+            success: true,
             message: "Login successful.",
             data: {
                 user: {
@@ -232,7 +283,7 @@ router.get('/profile', auth, asyncHandler(async (req, res) => {
 
         // Get user details
         const user = await User.findById(userId).select('-password');
-        
+
         // Get user orders
         const orders = await Order.find({ userID: userId })
             .populate('couponCode', 'id couponCode discountType discountAmount')
@@ -337,7 +388,7 @@ router.put('/profile', auth, (req, res, next) => {
             user.email = email;
         }
         if (phoneNo !== undefined) user.phoneNo = phoneNo;
-        
+
         // Update password if provided
         if (password) {
             const salt = await bcrypt.genSalt(10);
@@ -370,9 +421,9 @@ router.put('/profile', auth, (req, res, next) => {
 
         await user.save();
 
-        res.json({ 
-            success: true, 
-            message: "User updated successfully.", 
+        res.json({
+            success: true,
+            message: "User updated successfully.",
             data: {
                 id: user._id,
                 name: user.name,
@@ -389,6 +440,26 @@ router.put('/profile', auth, (req, res, next) => {
     }
 }));
 
+// Update FCM Token
+router.put('/update-fcm-token', auth, asyncHandler(async (req, res) => {
+    try {
+        const { fcmToken } = req.body;
+        const user = await User.findById(req.user._id);
+
+        if (!user) {
+            return res.status(404).json({ success: false, message: "User not found." });
+        }
+
+        user.fcmToken = fcmToken;
+        await user.save();
+
+        res.json({ success: true, message: "FCM Token updated successfully." });
+    } catch (error) {
+        res.status(500).json({ success: false, message: error.message });
+    }
+}));
+
+
 // Change Password
 router.put('/change-password', auth, asyncHandler(async (req, res) => {
     try {
@@ -396,16 +467,16 @@ router.put('/change-password', auth, asyncHandler(async (req, res) => {
 
         // Validation
         if (!oldPassword || !newPassword) {
-            return res.status(400).json({ 
-                success: false, 
-                message: "Old password and new password are required." 
+            return res.status(400).json({
+                success: false,
+                message: "Old password and new password are required."
             });
         }
 
         if (newPassword.length < 6) {
-            return res.status(400).json({ 
-                success: false, 
-                message: "New password must be at least 6 characters long." 
+            return res.status(400).json({
+                success: false,
+                message: "New password must be at least 6 characters long."
             });
         }
 
@@ -413,27 +484,27 @@ router.put('/change-password', auth, asyncHandler(async (req, res) => {
         const user = await User.findById(req.user._id);
 
         if (!user) {
-            return res.status(404).json({ 
-                success: false, 
-                message: "User not found." 
+            return res.status(404).json({
+                success: false,
+                message: "User not found."
             });
         }
 
         // Verify old password
         const isOldPasswordValid = await bcrypt.compare(oldPassword, user.password);
         if (!isOldPasswordValid) {
-            return res.status(400).json({ 
-                success: false, 
-                message: "Old password is incorrect." 
+            return res.status(400).json({
+                success: false,
+                message: "Old password is incorrect."
             });
         }
 
         // Check if new password is same as old password
         const isSamePassword = await bcrypt.compare(newPassword, user.password);
         if (isSamePassword) {
-            return res.status(400).json({ 
-                success: false, 
-                message: "New password must be different from old password." 
+            return res.status(400).json({
+                success: false,
+                message: "New password must be different from old password."
             });
         }
 
@@ -445,13 +516,94 @@ router.put('/change-password', auth, asyncHandler(async (req, res) => {
         user.password = hashedNewPassword;
         await user.save();
 
-        res.json({ 
-            success: true, 
+        res.json({
+            success: true,
             message: "Successfully changed password",
             data: {
                 message: "Password has been changed successfully"
             }
         });
+    } catch (error) {
+        res.status(500).json({ success: false, message: error.message });
+    }
+}));
+
+// Forgot Password - Send OTP
+router.post('/forgot-password-otp', asyncHandler(async (req, res) => {
+    const { email } = req.body;
+
+    if (!email) {
+        return res.status(400).json({ success: false, message: "Email is required." });
+    }
+
+    try {
+        // Check if user exists
+        const user = await User.findOne({ email });
+        if (!user) {
+            return res.status(404).json({ success: false, message: "User with this email does not exist." });
+        }
+
+        // Generate 6-digit OTP
+        const otpCodes = Math.floor(100000 + Math.random() * 900000).toString();
+
+        // Save OTP to database (upsert: update if exists, insert if not)
+        await OTP.findOneAndUpdate(
+            { email },
+            { otp: otpCodes, createdAt: Date.now() },
+            { upsert: true, new: true, setDefaultsOnInsert: true }
+        );
+
+        // Send OTP via email
+        const emailSent = await sendOtpEmail(email, otpCodes);
+
+        if (emailSent) {
+            res.json({ success: true, message: "OTP sent successfully to your email." });
+        } else {
+            res.status(500).json({ success: false, message: "Failed to send OTP email." });
+        }
+    } catch (error) {
+        res.status(500).json({ success: false, message: error.message });
+    }
+}));
+
+// Reset Password - Verify OTP and Update Password
+router.post('/reset-password', asyncHandler(async (req, res) => {
+    const { email, otp, newPassword } = req.body;
+
+    if (!email || !otp || !newPassword) {
+        return res.status(400).json({ success: false, message: "Email, OTP, and new password are required." });
+    }
+
+    if (newPassword.length < 6) {
+        return res.status(400).json({ success: false, message: "New password must be at least 6 characters long." });
+    }
+
+    try {
+        // Verify OTP
+        const existingOtp = await OTP.findOne({ email });
+        if (!existingOtp || existingOtp.otp !== otp) {
+            return res.status(400).json({ success: false, message: "Invalid or expired OTP." });
+        }
+
+        // Find user
+        const user = await User.findOne({ email });
+        if (!user) {
+            return res.status(404).json({ success: false, message: "User not found." });
+        }
+
+        // Hash new password
+        const salt = await bcrypt.genSalt(10);
+        const hashedPassword = await bcrypt.hash(newPassword, salt);
+
+        // Update password
+        user.password = hashedPassword;
+        await user.save();
+
+        // Delete used OTP
+        await OTP.deleteOne({ email });
+
+        res.json({ success: true, message: "Password reset successfully. You can now login with your new password." });
+
     } catch (error) {
         res.status(500).json({ success: false, message: error.message });
     }

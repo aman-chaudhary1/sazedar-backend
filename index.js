@@ -1,81 +1,4 @@
-//const express = require('express');
-//const bodyParser = require('body-parser');
-//const cors = require('cors');
-//const mongoose = require('mongoose');
-//const asyncHandler = require('express-async-handler');
-//const dotenv = require('dotenv');
-//
-//dotenv.config();
-//
-//const app = express();
-//
-//// Base URL for generating image URLs
-//const HOST_URL = process.env.BASE_URL || `http://localhost:${process.env.PORT}`;
-//app.locals.HOST_URL = HOST_URL;
-//
-//console.log("SERVER BASE URL:", HOST_URL);
-//
-//// Middlewares
-//app.use(cors({ origin: '*' }));
-//app.use(bodyParser.json());
-//
-//// Static Folders
-//app.use('/image/products', express.static('public/products'));
-//app.use('/image/category', express.static('public/category'));
-//app.use('/image/poster', express.static('public/posters'));
-//
-//// MongoDB Connection
-//const URL = process.env.MONGO_URL;
-//
-//if (!URL) {
-//    console.error('MONGO_URL is missing in .env');
-//    process.exit(1);
-//}
-//
-//mongoose.connect(URL, {
-//    serverSelectionTimeoutMS: 30000,
-//    socketTimeoutMS: 45000,
-//    maxPoolSize: 10,
-//    retryWrites: true,
-//    w: 'majority'
-//}).then(() => {
-//    console.log('MongoDB connected successfully');
-//}).catch((error) => {
-//    console.error('MongoDB connection failed:', error.message);
-//    process.exit(1);
-//});
-//
-//// Routes
-//app.use('/categories', require('./routes/category'));
-//app.use('/subCategories', require('./routes/subCategory'));
-//app.use('/brands', require('./routes/brand'));
-//app.use('/variantTypes', require('./routes/variantType'));
-//app.use('/variants', require('./routes/variant'));
-//app.use('/products', require('./routes/product'));
-//app.use('/couponCodes', require('./routes/couponCode'));
-//app.use('/posters', require('./routes/poster'));
-//app.use('/users', require('./routes/user'));
-//app.use('/orders', require('./routes/order'));
-//app.use('/payment', require('./routes/payment'));
-//app.use('/notification', require('./routes/notification'));
-//app.use('/api/address', require('./routes/address'));
-//app.use('/cart', require('./routes/cart'));
-//app.use('/favorites', require('./routes/favorite'));
-//
-//// Test API
-//app.get('/', (req, res) => {
-//    res.json({ success: true, message: 'API running successfully' });
-//});
-//
-//// Global Error Handler
-//app.use((err, req, res, next) => {
-//    res.status(500).json({ success: false, message: err.message });
-//});
-//
-//// Start Server
-//app.listen(process.env.PORT, () => {
-//    console.log(`Server running at http://localhost:${process.env.PORT}`);
-//});
+
 const express = require('express');
 const bodyParser = require('body-parser');
 const cors = require('cors');
@@ -142,23 +65,23 @@ mongoose
   })
   .then(async () => {
     console.log('✅ MongoDB connected');
-    
+
     // Migration: Drop old unique index on addresses.userId if it exists
     try {
       const Address = require('./model/address');
       const indexes = await Address.collection.getIndexes();
-      
+
       // Find unique index on userId
       const userIdUniqueIndex = Object.keys(indexes).find(indexName => {
         const index = indexes[indexName];
         return index.key && index.key.userId === 1 && index.unique === true;
       });
-      
+
       if (userIdUniqueIndex) {
         console.log('🔄 Dropping old unique index on addresses.userId...');
         await Address.collection.dropIndex(userIdUniqueIndex);
         console.log('✅ Old unique index dropped successfully');
-        
+
         // Ensure non-unique index exists
         await Address.collection.createIndex({ userId: 1 }, { unique: false });
         console.log('✅ New non-unique index created');
@@ -223,6 +146,9 @@ app.use((err, req, res, next) => {
    SERVER START
 ====================== */
 
-app.listen(PORT, () => {
+// app.listen(PORT, () => {
+//   console.log(`🚀 Server running on port ${PORT}`);
+// });
+app.listen(PORT, '0.0.0.0', () => {
   console.log(`🚀 Server running on port ${PORT}`);
 });

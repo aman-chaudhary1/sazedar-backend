@@ -8,43 +8,43 @@ const cloudinary = require('../config/cloudinary');
 
 // Get all products
 router.get('/', asyncHandler(async (req, res) => {
-    try {
-        const filter = {};
+  try {
+    const filter = {};
 
-        // Optional filter to get only today's special products: /products?todaysSpecial=true
-        if (req.query.todaysSpecial === 'true') {
-          filter.todaysSpecial = true;
-        }
-
-        const products = await Product.find(filter)
-        .populate('proCategoryId', 'id name')
-        .populate('proSubCategoryId', 'id name')
-        .populate('proBrandId', 'id name')
-        .populate('proVariantTypeId', 'id type')
-        .populate('proVariantId', 'id name');
-        res.json({ success: true, message: "Products retrieved successfully.", data: products });
-    } catch (error) {
-        res.status(500).json({ success: false, message: error.message });
+    // Optional filter to get only today's special products: /products?todaysSpecial=true
+    if (req.query.todaysSpecial === 'true') {
+      filter.todaysSpecial = true;
     }
+
+    const products = await Product.find(filter)
+      .populate('proCategoryId', 'id name')
+      .populate('proSubCategoryId', 'id name')
+      .populate('proBrandId', 'id name')
+      .populate('proVariantTypeId', 'id type')
+      .populate('proVariantId', 'id name');
+    res.json({ success: true, message: "Products retrieved successfully.", data: products });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
 }));
 
 // Get a product by ID
 router.get('/:id', asyncHandler(async (req, res) => {
-    try {
-        const productID = req.params.id;
-        const product = await Product.findById(productID)
-            .populate('proCategoryId', 'id name')
-            .populate('proSubCategoryId', 'id name')
-            .populate('proBrandId', 'id name')
-            .populate('proVariantTypeId', 'id name')
-            .populate('proVariantId', 'id name');
-        if (!product) {
-            return res.status(404).json({ success: false, message: "Product not found." });
-        }
-        res.json({ success: true, message: "Product retrieved successfully.", data: product });
-    } catch (error) {
-        res.status(500).json({ success: false, message: error.message });
+  try {
+    const productID = req.params.id;
+    const product = await Product.findById(productID)
+      .populate('proCategoryId', 'id name')
+      .populate('proSubCategoryId', 'id name')
+      .populate('proBrandId', 'id name')
+      .populate('proVariantTypeId', 'id name')
+      .populate('proVariantId', 'id name');
+    if (!product) {
+      return res.status(404).json({ success: false, message: "Product not found." });
     }
+    res.json({ success: true, message: "Product retrieved successfully.", data: product });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
 }));
 
 
@@ -62,10 +62,13 @@ router.post('/', asyncHandler(async (req, res) => {
     if (err instanceof multer.MulterError) {
       return res.json({ success: false, message: err.message });
     } else if (err) {
-      return res.json({ success: false, message: err });
+      return res.json({ success: false, message: err.message || "File upload error" });
     }
 
     try {
+      console.log('🔹 [CREATE PRODUCT] Request Body:', req.body);
+      console.log('🔹 [CREATE PRODUCT] Request Files:', req.files ? Object.keys(req.files) : 'No files');
+
       const {
         name,
         description,
@@ -77,7 +80,9 @@ router.post('/', asyncHandler(async (req, res) => {
         proSubCategoryId,
         proBrandId,
         proVariantTypeId,
-        proVariantId
+        proVariantId,
+        unit,
+        productSize
       } = req.body;
 
       // Only these fields are strictly required
@@ -126,10 +131,14 @@ router.post('/', asyncHandler(async (req, res) => {
         proBrandId: proBrandId || null,
         proVariantTypeId: proVariantTypeId || null,
         proVariantId: proVariantId || [],
+        unit: unit || 'Pc',
+        productSize: productSize ? Number(productSize) : null,
         images: imageUrls,
+        isAvailable: req.body.isAvailable === 'true' || req.body.isAvailable === true,
       });
 
       await newProduct.save();
+      console.log('✅ [CREATE PRODUCT] Saved to DB:', newProduct);
 
       res.json({
         success: true,
@@ -160,7 +169,7 @@ router.put('/:id', asyncHandler(async (req, res) => {
   ])(req, res, async function (err) {
 
     if (err) {
-      return res.status(500).json({ success: false, message: err.message });
+      return res.status(500).json({ success: false, message: err.message || "File upload error" });
     }
 
     try {
@@ -168,6 +177,11 @@ router.put('/:id', asyncHandler(async (req, res) => {
       if (!product) {
         return res.status(404).json({ success: false, message: "Product not found." });
       }
+
+      console.log('🔸 [UPDATE PRODUCT] Product ID:', productId);
+      console.log('🔸 [UPDATE PRODUCT] Request Body:', req.body);
+      console.log('🔸 [UPDATE PRODUCT] Request Files:', req.files ? Object.keys(req.files) : 'No files');
+
 
       const {
         name,
@@ -180,7 +194,9 @@ router.put('/:id', asyncHandler(async (req, res) => {
         proSubCategoryId,
         proBrandId,
         proVariantTypeId,
-        proVariantId
+        proVariantId,
+        unit,
+        productSize
       } = req.body;
 
       product.name = name || product.name;
@@ -206,6 +222,24 @@ router.put('/:id', asyncHandler(async (req, res) => {
       product.proBrandId = proBrandId || product.proBrandId;
       product.proVariantTypeId = proVariantTypeId || product.proVariantTypeId;
       product.proVariantId = proVariantId || product.proVariantId;
+      product.unit = unit || product.unit;
+      if (typeof productSize !== 'undefined') {
+        if (productSize === '' || productSize === 'null' || productSize === null) {
+          product.productSize = null;
+        } else {
+          const updatedSize = Number(productSize);
+          if (Number.isNaN(updatedSize)) {
+            // If valid number check fails, we can either ignore or error. 
+            // Given the issue, let's error to be safe, or just ignore if it's garbage.
+            // But following offerPrice pattern:
+            return res.status(400).json({ success: false, message: "productSize must be a number." });
+          }
+          product.productSize = updatedSize;
+        }
+      }
+      if (typeof req.body.isAvailable !== 'undefined') {
+        product.isAvailable = req.body.isAvailable === 'true' || req.body.isAvailable === true;
+      }
 
       const fields = ['image1', 'image2', 'image3', 'image4', 'image5'];
 
@@ -229,6 +263,7 @@ router.put('/:id', asyncHandler(async (req, res) => {
       }
 
       await product.save();
+      console.log('✅ [UPDATE PRODUCT] Updated in DB:', product);
 
       res.json({
         success: true,
@@ -245,16 +280,16 @@ router.put('/:id', asyncHandler(async (req, res) => {
 
 // Delete a product
 router.delete('/:id', asyncHandler(async (req, res) => {
-    const productID = req.params.id;
-    try {
-        const product = await Product.findByIdAndDelete(productID);
-        if (!product) {
-            return res.status(404).json({ success: false, message: "Product not found." });
-        }
-        res.json({ success: true, message: "Product deleted successfully." });
-    } catch (error) {
-        res.status(500).json({ success: false, message: error.message });
+  const productID = req.params.id;
+  try {
+    const product = await Product.findByIdAndDelete(productID);
+    if (!product) {
+      return res.status(404).json({ success: false, message: "Product not found." });
     }
+    res.json({ success: true, message: "Product deleted successfully." });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
 }));
 
 module.exports = router;

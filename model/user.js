@@ -21,6 +21,11 @@ const userSchema = new mongoose.Schema({
     type: String,
     trim: true
   },
+  fcmToken: {
+    type: String,
+    default: null
+  },
+
   profileImage: {
     type: String,
     default: null

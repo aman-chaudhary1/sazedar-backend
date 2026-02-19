@@ -14,6 +14,14 @@ const productSchema = new mongoose.Schema({
         type: Number,
         required: true
     },
+    unit: {
+        type: String, // e.g., 'Kg', 'Gm', 'Ltr', 'Pc'
+        default: 'Pc'
+    },
+    productSize: {
+        type: Number, // e.g., 400, 1, 500
+        default: null
+    },
     price: {
         type: Number,
         required: true
@@ -25,6 +33,10 @@ const productSchema = new mongoose.Schema({
     todaysSpecial: {
         type: Boolean,
         default: false
+    },
+    isAvailable: {
+        type: Boolean,
+        default: true
     },
     proCategoryId: {
         type: mongoose.Schema.Types.ObjectId,
