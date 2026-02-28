@@ -1,17 +1,21 @@
 const admin = require("firebase-admin");
 
-let serviceAccount;
+let isFirebaseInitialized = false;
 
 if (process.env.FIREBASE_SERVICE_ACCOUNT) {
-    // Production (Render)
-    serviceAccount = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT);
+  try {
+    const serviceAccount = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT);
+    admin.initializeApp({
+      credential: admin.credential.cert(serviceAccount),
+    });
+    isFirebaseInitialized = true;
+    console.log("✅ Firebase Admin initialized successfully");
+  } catch (error) {
+    console.error("❌ Firebase Admin initialization failed:", error.message);
+  }
 } else {
-    // Local development (optional)
-    serviceAccount = require("./serviceAccountKey.json");
+  console.warn("⚠️ FIREBASE_SERVICE_ACCOUNT is not set. Push notifications will be disabled.");
 }
 
-admin.initializeApp({
-    credential: admin.credential.cert(serviceAccount),
-});
-
+admin.isInitialized = isFirebaseInitialized;
 module.exports = admin;

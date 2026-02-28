@@ -115,6 +115,7 @@ app.use('/orders', require('./routes/order'));
 app.use('/payment', require('./routes/payment'));
 app.use('/notification', require('./routes/notification'));
 app.use('/api/address', require('./routes/address'));
+app.use('/api/rural-areas', require('./routes/ruralArea'));
 app.use('/cart', require('./routes/cart'));
 app.use('/favorites', require('./routes/favorite'));
 

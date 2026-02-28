@@ -8,6 +8,13 @@ const User = require('../model/user');
 router.post('/send-notification', asyncHandler(async (req, res) => {
     const { title, description, imageUrl, userId } = req.body;
 
+    if (!admin.isInitialized) {
+        return res.status(503).json({
+            success: false,
+            message: "Push notifications are currently disabled (Firebase not configured)."
+        });
+    }
+
     try {
         let response;
         const notificationPayload = {

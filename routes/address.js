@@ -60,13 +60,13 @@ router.get('/:id', auth, asyncHandler(async (req, res) => {
 // =========================
 router.post('/', auth, asyncHandler(async (req, res) => {
   try {
-    const { phone, street, city, state, postalCode, country, addressType, label, isDefault } = req.body;
+    const { phone, landmark, village, panchayat, block, addressType, label, isDefault } = req.body;
 
     // Validation
-    if (!phone || !street || !city || !state || !postalCode) {
+    if (!phone || !landmark || !village || !panchayat || !block) {
       return res.status(400).json({
         success: false,
-        message: 'Phone, street, city, state, and postal code are required',
+        message: 'Phone, landmark, village, panchayat, and block are required',
       });
     }
 
@@ -81,11 +81,10 @@ router.post('/', auth, asyncHandler(async (req, res) => {
     const address = new Address({
       userId: req.user._id,
       phone,
-      street,
-      city,
-      state,
-      postalCode,
-      country: country || 'India',
+      landmark,
+      village,
+      panchayat,
+      block,
       addressType: addressType || 'home',
       label: label || null,
       isDefault: isDefault || false,
@@ -108,7 +107,7 @@ router.post('/', auth, asyncHandler(async (req, res) => {
 // =========================
 router.put('/:id', auth, asyncHandler(async (req, res) => {
   try {
-    const { phone, street, city, state, postalCode, country, addressType, label, isDefault } = req.body;
+    const { phone, landmark, village, panchayat, block, addressType, label, isDefault } = req.body;
 
     const address = await Address.findOne({
       _id: req.params.id,
@@ -124,11 +123,10 @@ router.put('/:id', auth, asyncHandler(async (req, res) => {
 
     // Update fields if provided
     if (phone !== undefined) address.phone = phone;
-    if (street !== undefined) address.street = street;
-    if (city !== undefined) address.city = city;
-    if (state !== undefined) address.state = state;
-    if (postalCode !== undefined) address.postalCode = postalCode;
-    if (country !== undefined) address.country = country;
+    if (landmark !== undefined) address.landmark = landmark;
+    if (village !== undefined) address.village = village;
+    if (panchayat !== undefined) address.panchayat = panchayat;
+    if (block !== undefined) address.block = block;
     if (addressType !== undefined) address.addressType = addressType;
     if (label !== undefined) address.label = label;
 

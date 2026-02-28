@@ -8,20 +8,20 @@ const asyncHandler = require('express-async-handler');
 router.get('/', auth, asyncHandler(async (req, res) => {
   try {
     const cart = await Cart.findOne({ userId: req.user._id })
-      .populate('items.productId', 'name price offerPrice images proCategoryId proSubCategoryId proBrandId');
-    
+      .populate('items.productId', 'name price offerPrice images unit productSize proCategoryId proSubCategoryId proBrandId');
+
     if (!cart) {
-      return res.json({ 
-        success: true, 
-        message: "Cart retrieved successfully.", 
-        data: { items: [] } 
+      return res.json({
+        success: true,
+        message: "Cart retrieved successfully.",
+        data: { items: [] }
       });
     }
 
-    res.json({ 
-      success: true, 
-      message: "Cart retrieved successfully.", 
-      data: cart 
+    res.json({
+      success: true,
+      message: "Cart retrieved successfully.",
+      data: cart
     });
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });
@@ -34,9 +34,9 @@ router.post('/add', auth, asyncHandler(async (req, res) => {
     const { productId, quantity, variant } = req.body;
 
     if (!productId || !quantity) {
-      return res.status(400).json({ 
-        success: false, 
-        message: "Product ID and quantity are required." 
+      return res.status(400).json({
+        success: false,
+        message: "Product ID and quantity are required."
       });
     }
 
@@ -65,12 +65,12 @@ router.post('/add', auth, asyncHandler(async (req, res) => {
 
     await cart.save();
     const updatedCart = await Cart.findById(cart._id)
-      .populate('items.productId', 'name price offerPrice images');
+      .populate('items.productId', 'name price offerPrice images unit productSize');
 
-    res.json({ 
-      success: true, 
-      message: "Item added to cart successfully.", 
-      data: updatedCart 
+    res.json({
+      success: true,
+      message: "Item added to cart successfully.",
+      data: updatedCart
     });
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });
@@ -83,18 +83,18 @@ router.put('/update', auth, asyncHandler(async (req, res) => {
     const { productId, quantity } = req.body;
 
     if (!productId || !quantity) {
-      return res.status(400).json({ 
-        success: false, 
-        message: "Product ID and quantity are required." 
+      return res.status(400).json({
+        success: false,
+        message: "Product ID and quantity are required."
       });
     }
 
     const cart = await Cart.findOne({ userId: req.user._id });
 
     if (!cart) {
-      return res.status(404).json({ 
-        success: false, 
-        message: "Cart not found." 
+      return res.status(404).json({
+        success: false,
+        message: "Cart not found."
       });
     }
 
@@ -103,9 +103,9 @@ router.put('/update', auth, asyncHandler(async (req, res) => {
     );
 
     if (itemIndex === -1) {
-      return res.status(404).json({ 
-        success: false, 
-        message: "Item not found in cart." 
+      return res.status(404).json({
+        success: false,
+        message: "Item not found in cart."
       });
     }
 
@@ -113,12 +113,12 @@ router.put('/update', auth, asyncHandler(async (req, res) => {
     await cart.save();
 
     const updatedCart = await Cart.findById(cart._id)
-      .populate('items.productId', 'name price offerPrice images');
+      .populate('items.productId', 'name price offerPrice images unit productSize');
 
-    res.json({ 
-      success: true, 
-      message: "Cart updated successfully.", 
-      data: updatedCart 
+    res.json({
+      success: true,
+      message: "Cart updated successfully.",
+      data: updatedCart
     });
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });
@@ -133,9 +133,9 @@ router.delete('/remove/:productId', auth, asyncHandler(async (req, res) => {
     const cart = await Cart.findOne({ userId: req.user._id });
 
     if (!cart) {
-      return res.status(404).json({ 
-        success: false, 
-        message: "Cart not found." 
+      return res.status(404).json({
+        success: false,
+        message: "Cart not found."
       });
     }
 
@@ -146,12 +146,12 @@ router.delete('/remove/:productId', auth, asyncHandler(async (req, res) => {
     await cart.save();
 
     const updatedCart = await Cart.findById(cart._id)
-      .populate('items.productId', 'name price offerPrice images');
+      .populate('items.productId', 'name price offerPrice images unit productSize');
 
-    res.json({ 
-      success: true, 
-      message: "Item removed from cart successfully.", 
-      data: updatedCart 
+    res.json({
+      success: true,
+      message: "Item removed from cart successfully.",
+      data: updatedCart
     });
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });
@@ -164,19 +164,19 @@ router.delete('/clear', auth, asyncHandler(async (req, res) => {
     const cart = await Cart.findOne({ userId: req.user._id });
 
     if (!cart) {
-      return res.status(404).json({ 
-        success: false, 
-        message: "Cart not found." 
+      return res.status(404).json({
+        success: false,
+        message: "Cart not found."
       });
     }
 
     cart.items = [];
     await cart.save();
 
-    res.json({ 
-      success: true, 
-      message: "Cart cleared successfully.", 
-      data: cart 
+    res.json({
+      success: true,
+      message: "Cart cleared successfully.",
+      data: cart
     });
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });

@@ -12,26 +12,21 @@ const addressSchema = new mongoose.Schema(
       type: String,
       required: true
     },
-    street: {
+    landmark: {
       type: String,
       required: true
     },
-    city: {
+    village: {
       type: String,
       required: true
     },
-    state: {
+    panchayat: {
       type: String,
       required: true
     },
-    postalCode: {
+    block: {
       type: String,
       required: true
-    },
-    country: {
-      type: String,
-      required: true,
-      default: 'India'
     },
     addressType: {
       type: String,

@@ -37,6 +37,9 @@ const orderSchema = new mongoose.Schema({
       variant: {
         type: String,
       },
+      unit: {
+        type: String,
+      },
     }
   ],
   totalPrice: {
@@ -45,11 +48,10 @@ const orderSchema = new mongoose.Schema({
   },
   shippingAddress: {
     phone: String,
-    street: String,
-    city: String,
-    state: String,
-    postalCode: String,
-    country: String
+    landmark: String,
+    village: String,
+    panchayat: String,
+    block: String
   },
 
   paymentMethod: {
@@ -60,7 +62,7 @@ const orderSchema = new mongoose.Schema({
   couponCode: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'Coupon'
-},
+  },
   orderTotal: {
     subtotal: Number,
     discount: Number,
