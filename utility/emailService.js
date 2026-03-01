@@ -1,27 +1,24 @@
-const nodemailer = require('nodemailer');
-const dns = require('dns');
+const axios = require('axios');
 
-const transporter = nodemailer.createTransport({
-    service: 'gmail',
-    auth: {
-        user: process.env.EMAIL_USER,
-        pass: process.env.EMAIL_PASS
-    }
-});
-
-if (!process.env.EMAIL_USER || !process.env.EMAIL_PASS) {
-    console.warn('⚠️ EMAIL_USER or EMAIL_PASS environment variables are missing!');
+if (!process.env.BREVO_API_KEY) {
+    console.warn('⚠️ BREVO_API_KEY environment variable is missing! OTP emails will fail.');
 } else {
-    console.log('✅ Email credentials detected');
+    console.log('✅ Brevo API Key detected');
 }
 
 const sendOtpEmail = async (email, otp, subject = 'Your OTP', title = 'Verification Code') => {
-    console.log(`📧 Attempting to send ${subject} to: ${email}...`);
-    const mailOptions = {
-        from: process.env.EMAIL_USER,
-        to: email,
+    console.log(`📧 Attempting to send ${subject} to: ${email} via Brevo HTTP API...`);
+
+    const url = 'https://api.brevo.com/v3/smtp/email';
+
+    const data = {
+        sender: {
+            name: "Sazedar MultiGrocery",
+            email: process.env.EMAIL_USER || "amanchaudhary4510@gmail.com"
+        },
+        to: [{ email: email }],
         subject: subject,
-        html: `
+        htmlContent: `
             <div style="font-family: Arial, sans-serif; padding: 20px; color: #333;">
                 <h2>${title}</h2>
                 <p>Your One-Time Password (OTP) is:</p>
@@ -33,11 +30,17 @@ const sendOtpEmail = async (email, otp, subject = 'Your OTP', title = 'Verificat
     };
 
     try {
-        await transporter.sendMail(mailOptions);
-        console.log(`OTP email sent to ${email} with subject: ${subject}`);
+        const response = await axios.post(url, data, {
+            headers: {
+                'api-key': process.env.BREVO_API_KEY,
+                'Content-Type': 'application/json'
+            }
+        });
+
+        console.log(`✅ OTP email sent successfully via Brevo to ${email}. Message ID: ${response.data.messageId}`);
         return true;
     } catch (error) {
-        console.error('Error sending email:', error);
+        console.error('❌ Error sending email via Brevo:', error.response ? error.response.data : error.message);
         return false;
     }
 };
