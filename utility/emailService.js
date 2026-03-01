@@ -30,9 +30,15 @@ const sendOtpEmail = async (email, otp, subject = 'Your OTP', title = 'Verificat
     };
 
     try {
+        // Mask the API key for logging to help troubleshoot
+        const key = process.env.BREVO_API_KEY || '';
+        const maskedKey = key.length > 10 ? `${key.substring(0, 4)}...${key.substring(key.length - 4)}` : 'INVALID_LENGTH';
+        console.log(`🔑 Using Brevo API Key: ${maskedKey}`);
+
         const response = await axios.post(url, data, {
             headers: {
                 'api-key': process.env.BREVO_API_KEY,
+                'x-sib-api-key': process.env.BREVO_API_KEY, // Compatibility header
                 'Content-Type': 'application/json'
             }
         });
@@ -40,7 +46,14 @@ const sendOtpEmail = async (email, otp, subject = 'Your OTP', title = 'Verificat
         console.log(`✅ OTP email sent successfully via Brevo to ${email}. Message ID: ${response.data.messageId}`);
         return true;
     } catch (error) {
-        console.error('❌ Error sending email via Brevo:', error.response ? error.response.data : error.message);
+        if (error.response && error.response.data) {
+            console.error('❌ Brevo API Error:', error.response.data);
+            if (error.response.data.code === 'unauthorized') {
+                console.error('💡 TIP: Make sure you are using an "API Key" and NOT a "SMTP Password". API Keys start with "xkeysib-".');
+            }
+        } else {
+            console.error('❌ Error sending email via Brevo:', error.message);
+        }
         return false;
     }
 };
