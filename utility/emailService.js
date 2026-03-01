@@ -2,22 +2,21 @@ const nodemailer = require('nodemailer');
 const dns = require('dns');
 
 const transporter = nodemailer.createTransport({
-    host: 'smtp.gmail.com',
-    port: 587,
-    secure: false, // Use STARTTLS (more reliable on Render)
-    // Force IPv4 lookup for this transporter to bypass Render IPv6 issues
-    lookup: (hostname, options, callback) => {
-        dns.lookup(hostname, { family: 4 }, callback);
-    },
-    connectionTimeout: 10000, // 10 seconds
-    greetingTimeout: 10000,   // 10 seconds
+    service: 'gmail',
     auth: {
         user: process.env.EMAIL_USER,
         pass: process.env.EMAIL_PASS
     }
 });
 
+if (!process.env.EMAIL_USER || !process.env.EMAIL_PASS) {
+    console.warn('⚠️ EMAIL_USER or EMAIL_PASS environment variables are missing!');
+} else {
+    console.log('✅ Email credentials detected');
+}
+
 const sendOtpEmail = async (email, otp, subject = 'Your OTP', title = 'Verification Code') => {
+    console.log(`📧 Attempting to send ${subject} to: ${email}...`);
     const mailOptions = {
         from: process.env.EMAIL_USER,
         to: email,
