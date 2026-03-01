@@ -49,7 +49,7 @@ router.post('/send-otp', asyncHandler(async (req, res) => {
         );
 
         // Send OTP via email
-        const emailSent = await sendOtpEmail(email, otpCodes);
+        const emailSent = await sendOtpEmail(email, otpCodes, 'Registration OTP', 'Email Verification');
 
         if (emailSent) {
             res.json({ success: true, message: "OTP sent successfully to your email." });
@@ -554,7 +554,7 @@ router.post('/forgot-password-otp', asyncHandler(async (req, res) => {
         );
 
         // Send OTP via email
-        const emailSent = await sendOtpEmail(email, otpCodes);
+        const emailSent = await sendOtpEmail(email, otpCodes, 'Password Reset OTP', 'Forgot Password Verification');
 
         if (emailSent) {
             res.json({ success: true, message: "OTP sent successfully to your email." });
