@@ -60,7 +60,7 @@ router.get('/:id', auth, asyncHandler(async (req, res) => {
 // =========================
 router.post('/', auth, asyncHandler(async (req, res) => {
   try {
-    const { phone, landmark, village, panchayat, block, addressType, label, isDefault } = req.body;
+    const { phone, landmark, village, panchayat, block, addressType, label, isDefault, deliveryFee } = req.body;
 
     // Validation
     if (!phone || !landmark || !village || !panchayat || !block) {
@@ -88,6 +88,7 @@ router.post('/', auth, asyncHandler(async (req, res) => {
       addressType: addressType || 'home',
       label: label || null,
       isDefault: isDefault || false,
+      deliveryFee: deliveryFee || 0,
     });
 
     await address.save();
@@ -107,7 +108,7 @@ router.post('/', auth, asyncHandler(async (req, res) => {
 // =========================
 router.put('/:id', auth, asyncHandler(async (req, res) => {
   try {
-    const { phone, landmark, village, panchayat, block, addressType, label, isDefault } = req.body;
+    const { phone, landmark, village, panchayat, block, addressType, label, isDefault, deliveryFee } = req.body;
 
     const address = await Address.findOne({
       _id: req.params.id,
@@ -129,6 +130,7 @@ router.put('/:id', auth, asyncHandler(async (req, res) => {
     if (block !== undefined) address.block = block;
     if (addressType !== undefined) address.addressType = addressType;
     if (label !== undefined) address.label = label;
+    if (deliveryFee !== undefined) address.deliveryFee = deliveryFee;
 
     // Handle default address
     if (isDefault === true && !address.isDefault) {

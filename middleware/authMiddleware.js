@@ -8,8 +8,12 @@ module.exports = async (req, res, next) => {
       return res.status(401).json({ success: false, message: 'Unauthorized' });
     }
 
-    const decoded = jwt.verify(token, process.env.JWT_SECRET);
-    req.user = await User.findById(decoded.id).select('-password');
+    const decoded = jwt.verify(token, process.env.JWT_SECRET || 'your-secret-key');
+    const user = await User.findById(decoded.id).select('-password');
+    if (!user || user.userStatus === 'inactive') {
+      return res.status(401).json({ success: false, message: 'Your account has been deactivated or not found.' });
+    }
+    req.user = user;
     next();
   } catch (error) {
     res.status(401).json({ success: false, message: 'Invalid token' });

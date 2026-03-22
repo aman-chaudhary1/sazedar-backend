@@ -249,6 +249,14 @@ router.post('/login', asyncHandler(async (req, res) => {
             return res.status(401).json({ success: false, message: "Invalid email or password." });
         }
 
+        console.log(`Login attempt: ${email}, Status: ${user.userStatus}`);
+
+        // Check user status
+        if (user.userStatus === 'inactive') {
+            console.log(`Blocked login attempt for inactive user: ${email}`);
+            return res.status(401).json({ success: false, message: "Your account has been deactivated. Please contact support." });
+        }
+
         // Generate JWT token
         const token = jwt.sign(
             { id: user._id },
@@ -604,6 +612,29 @@ router.post('/reset-password', asyncHandler(async (req, res) => {
 
         res.json({ success: true, message: "Password reset successfully. You can now login with your new password." });
 
+    } catch (error) {
+        res.status(500).json({ success: false, message: error.message });
+    }
+}));
+
+// Update a user by ID (for admin use)
+router.put('/:id', asyncHandler(async (req, res) => {
+    try {
+        const userID = req.params.id;
+        const { name, email, phoneNo, userStatus } = req.body;
+        const user = await User.findById(userID);
+
+        if (!user) {
+            return res.status(404).json({ success: false, message: "User not found." });
+        }
+
+        if (name) user.name = name;
+        if (email) user.email = email;
+        if (phoneNo !== undefined) user.phoneNo = phoneNo;
+        if (userStatus) user.userStatus = userStatus;
+
+        await user.save();
+        res.json({ success: true, message: "User updated successfully.", data: user });
     } catch (error) {
         res.status(500).json({ success: false, message: error.message });
     }

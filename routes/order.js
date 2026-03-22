@@ -49,16 +49,37 @@ router.get('/:id', asyncHandler(async (req, res) => {
 
 // Create a new order
 router.post('/', asyncHandler(async (req, res) => {
-    const { userID,orderStatus, items, totalPrice, shippingAddress, paymentMethod, couponCode, orderTotal, trackingUrl } = req.body;
+    const { userID, orderStatus, items, totalPrice, shippingAddress, paymentMethod, couponCode, orderTotal, trackingUrl } = req.body;
+    
+    // Server-side logging to debug missing fields
+    console.log('--- Incoming Order Data ---');
+    console.log('shippingAddress:', JSON.stringify(shippingAddress, null, 2));
+    console.log('orderTotal:', JSON.stringify(orderTotal, null, 2));
+
     if (!userID || !items || !totalPrice || !shippingAddress || !paymentMethod || !orderTotal) {
         return res.status(400).json({ success: false, message: "User ID, items, totalPrice, shippingAddress, paymentMethod, and orderTotal are required." });
     }
 
     try {
-        const order = new Order({ userID,orderStatus, items, totalPrice, shippingAddress, paymentMethod, couponCode, orderTotal, trackingUrl });
+        const order = new Order({ 
+            userID, 
+            orderStatus, 
+            items, 
+            totalPrice, 
+            shippingAddress, 
+            paymentMethod, 
+            couponCode, 
+            orderTotal, 
+            trackingUrl 
+        });
+        
         const newOrder = await order.save();
-        res.json({ success: true, message: "Order created successfully.", data: null });
+        console.log('--- Saved Order ---');
+        console.log(JSON.stringify(newOrder, null, 2));
+
+        res.json({ success: true, message: "Order created successfully.", data: newOrder });
     } catch (error) {
+        console.error('Order creation error:', error);
         res.status(500).json({ success: false, message: error.message });
     }
 }));

@@ -47,11 +47,12 @@ const orderSchema = new mongoose.Schema({
     required: true
   },
   shippingAddress: {
-    phone: String,
-    landmark: String,
-    village: String,
-    panchayat: String,
-    block: String
+    phone: { type: String },
+    landmark: { type: String },
+    village: { type: String },
+    panchayat: { type: String },
+    block: { type: String },
+    deliveryFee: { type: Number, default: 0 }
   },
 
   paymentMethod: {
@@ -64,9 +65,10 @@ const orderSchema = new mongoose.Schema({
     ref: 'Coupon'
   },
   orderTotal: {
-    subtotal: Number,
-    discount: Number,
-    total: Number
+    subtotal: { type: Number },
+    discount: { type: Number },
+    shipping: { type: Number, default: 0 },
+    total: { type: Number }
   },
   trackingUrl: {
     type: String

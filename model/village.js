@@ -10,6 +10,10 @@ const villageSchema = new mongoose.Schema({
         type: mongoose.Schema.Types.ObjectId,
         ref: 'Panchayat',
         required: [true, 'Panchayat ID is required']
+    },
+    deliveryFee: {
+        type: Number,
+        default: 0
     }
 }, { timestamps: true });
 

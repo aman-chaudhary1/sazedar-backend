@@ -1,7 +1,7 @@
 const express = require('express');
 const asyncHandler = require('express-async-handler');
 const router = express.Router();
-const Coupon = require('../model/couponCode'); 
+const Coupon = require('../model/couponCode');
 const Product = require('../model/product');
 
 // Get all coupons
@@ -107,7 +107,7 @@ router.delete('/:id', asyncHandler(async (req, res) => {
 
 router.post('/check-coupon', asyncHandler(async (req, res) => {
     console.log(req.body);
-    const { couponCode, productIds,purchaseAmount } = req.body;
+    const { couponCode, productIds, purchaseAmount } = req.body;
 
     try {
         // Find the coupon with the provided coupon code
@@ -121,7 +121,9 @@ router.post('/check-coupon', asyncHandler(async (req, res) => {
 
         // Check if the coupon is expired
         const currentDate = new Date();
-        if (coupon.endDate < currentDate) {
+        const endDate = new Date(coupon.endDate);
+        endDate.setHours(23, 59, 59, 999);
+        if (endDate < currentDate) {
             return res.json({ success: false, message: "Coupon is expired." });
         }
 
@@ -130,37 +132,38 @@ router.post('/check-coupon', asyncHandler(async (req, res) => {
             return res.json({ success: false, message: "Coupon is inactive." });
         }
 
-       // Check if the purchase amount is greater than the minimum purchase amount specified in the coupon
-       if (coupon.minimumPurchaseAmount && purchaseAmount < coupon.minimumPurchaseAmount) {
-        return res.json({ success: false, message: "Minimum purchase amount not met." });
-    }
+        // Check if the purchase amount is greater than the minimum purchase amount specified in the coupon
+        if (coupon.minimumPurchaseAmount && purchaseAmount < coupon.minimumPurchaseAmount) {
+            return res.json({ success: false, message: "Minimum purchase amount not met." });
+        }
 
         // Check if the coupon is applicable for all orders
         if (!coupon.applicableCategory && !coupon.applicableSubCategory && !coupon.applicableProduct) {
-            return res.json({ success: true, message: "Coupon is applicable for all orders." ,data:coupon});
+            return res.json({ success: true, message: "Coupon is applicable for all orders.", data: coupon });
         }
 
         // Fetch the products from the database using the provided product IDs
         const products = await Product.find({ _id: { $in: productIds } });
 
-        // Check if any product in the list is not applicable for the coupon
-        const isValid = products.every(product => {
+        // Check if at least one product in the list is applicable for the coupon (Mixed cart support)
+        const isValid = products.some(product => {
+            let match = true;
             if (coupon.applicableCategory && coupon.applicableCategory.toString() !== product.proCategoryId.toString()) {
-                return false;
+                match = false;
             }
-            if (coupon.applicableSubCategory && coupon.applicableSubCategory.toString() !== product.proSubCategoryId.toString()) {
-                return false;
+            if (match && coupon.applicableSubCategory && product.proSubCategoryId && coupon.applicableSubCategory.toString() !== product.proSubCategoryId.toString()) {
+                match = false;
             }
-            if (coupon.applicableProduct && !product.proVariantId.includes(coupon.applicableProduct.toString())) {
-                return false;
+            if (match && coupon.applicableProduct && coupon.applicableProduct.toString() !== product._id.toString()) {
+                match = false;
             }
-            return true;
+            return match;
         });
 
         if (isValid) {
-            return res.json({ success: true, message: "Coupon is applicable for the provided products." ,data:coupon});
+            return res.json({ success: true, message: "Coupon is applicable for the provided products.", data: coupon });
         } else {
-            return res.json({ success: false, message: "Coupon is not applicable for the provided products." });
+            return res.json({ success: false, message: "This coupon is not applicable for the items in your cart." });
         }
     } catch (error) {
         console.error('Error checking coupon code:', error);

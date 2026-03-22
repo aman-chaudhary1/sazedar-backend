@@ -40,6 +40,10 @@ const addressSchema = new mongoose.Schema(
     label: {
       type: String, // e.g., "Home", "Office", "Mom's House"
       trim: true
+    },
+    deliveryFee: {
+      type: Number,
+      default: 0
     }
   },
   { timestamps: true }
