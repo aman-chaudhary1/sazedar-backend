@@ -7,7 +7,21 @@ const auth = require('../middleware/authMiddleware');
 // Get all orders
 router.get('/', asyncHandler(async (req, res) => {
     try {
-        const orders = await Order.find()
+        const { date } = req.query;
+        let filter = {};
+
+        if (date) {
+            // Assuming the date string is 'YYYY-MM-DD' and represents the start of the day in IST
+            const startOfDayIST = new Date(`${date}T00:00:00Z`);
+            startOfDayIST.setMinutes(startOfDayIST.getMinutes() - 330); // Offset for IST (UTC+5:30)
+
+            const endOfDayIST = new Date(`${date}T23:59:59.999Z`);
+            endOfDayIST.setMinutes(endOfDayIST.getMinutes() - 330);
+
+            filter.orderDate = { $gte: startOfDayIST, $lte: endOfDayIST };
+        }
+
+        const orders = await Order.find(filter)
         .populate('couponCode', 'id couponCode discountType discountAmount')
         .populate('userID', 'id name').sort({ _id: -1 });
         res.json({ success: true, message: "Orders retrieved successfully.", data: orders });
@@ -135,6 +149,34 @@ router.put('/cancel/:id', auth, asyncHandler(async (req, res) => {
                 message: "Invalid order ID." 
             });
         }
+        res.status(500).json({ success: false, message: error.message });
+    }
+}));
+
+// Bulk update orders status
+router.put('/bulk-update', asyncHandler(async (req, res) => {
+    try {
+        const { orderIds, newStatus } = req.body;
+
+        if (!orderIds || !Array.isArray(orderIds) || orderIds.length === 0) {
+            return res.status(400).json({ success: false, message: "Order IDs are required and must be a non-empty array." });
+        }
+
+        if (!newStatus) {
+            return res.status(400).json({ success: false, message: "New status is required." });
+        }
+
+        const result = await Order.updateMany(
+            { _id: { $in: orderIds } },
+            { $set: { orderStatus: newStatus } }
+        );
+
+        res.json({ 
+            success: true, 
+            message: `${result.modifiedCount} orders updated successfully.`, 
+            data: result 
+        });
+    } catch (error) {
         res.status(500).json({ success: false, message: error.message });
     }
 }));
