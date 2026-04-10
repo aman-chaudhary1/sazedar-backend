@@ -30,6 +30,29 @@ const userSchema = new mongoose.Schema({
     type: String,
     default: null
   },
+  role: {
+    type: String,
+    enum: ['admin', 'shopkeeper', 'user'],
+    default: 'user'
+  },
+  // Shopkeeper specific fields
+  shopName: {
+    type: String,
+    default: null
+  },
+  shopAddress: {
+    type: String,
+    default: null
+  },
+  assignedCategories: [{
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Category'
+  }],
+  shopStatus: {
+    type: String,
+    enum: ['active', 'inactive'],
+    default: 'active'
+  },
   userStatus: {
     type: String,
     enum: ['active', 'inactive'],

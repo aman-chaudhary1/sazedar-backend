@@ -84,6 +84,16 @@ router.get('/all-notification', asyncHandler(async (req, res) => {
     }
 }));
 
+// Added alias for the dashboard to fix 404
+router.get('/', asyncHandler(async (req, res) => {
+    try {
+        const notifications = await Notification.find({}).sort({ _id: -1 });
+        res.json({ success: true, message: "Notifications retrieved successfully.", data: notifications });
+    } catch (error) {
+        res.status(500).json({ success: false, message: error.message });
+    }
+}));
+
 
 router.delete('/delete-notification/:id', asyncHandler(async (req, res) => {
     const notificationID = req.params.id;

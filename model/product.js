@@ -67,7 +67,22 @@ const productSchema = new mongoose.Schema({
             type: String,
             required: true
         }
-    }]
+    }],
+    // Multi-vendor fields
+    addedBy: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'User',
+        default: null // null indicates added by Admin
+    },
+    status: {
+        type: String,
+        enum: ['pending', 'approved', 'rejected'],
+        default: 'approved' // Default to approved for legacy data compatibility
+    },
+    shopkeeperPrice: {
+        type: Number,
+        default: 0
+    }
 }, { timestamps: true });
 
 const Product = mongoose.model('Product', productSchema);

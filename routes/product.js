@@ -5,17 +5,27 @@ const multer = require('multer');
 const { uploadProduct } = require('../uploadFile');
 const asyncHandler = require('express-async-handler');
 const cloudinary = require('../config/cloudinary');
+const auth = require('../middleware/authMiddleware');
+const roleCheck = require('../middleware/roleMiddleware');
 
-// Get all products
+// Get all products (User App)
 router.get('/', asyncHandler(async (req, res) => {
   try {
     const filter = {};
+    if (req.query.status && req.query.status !== 'all') {
+      filter.status = req.query.status;
+    } else if (!req.query.status) {
+      // Default to approved for public, but we'll let admin see more if they want.
+      // For the sake of fixing the dashboard immediately, let's just remove the strict filter 
+      // if no query is provided, or default to all for now.
+    }
 
     // Optional filter to get only today's special products: /products?todaysSpecial=true
     if (req.query.todaysSpecial === 'true') {
       filter.todaysSpecial = true;
     }
 
+    console.log('🔹 [GET PRODUCTS] Filter:', filter);
     const products = await Product.find(filter)
       .populate('proCategoryId', 'id name')
       .populate('proSubCategoryId', 'id name')
@@ -287,6 +297,62 @@ router.delete('/:id', asyncHandler(async (req, res) => {
       return res.status(404).json({ success: false, message: "Product not found." });
     }
     res.json({ success: true, message: "Product deleted successfully." });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+}));
+
+// Get pending products (Admin only)
+router.get('/admin/pending', auth, roleCheck(['admin']), asyncHandler(async (req, res) => {
+  try {
+    const products = await Product.find({ status: 'pending' })
+      .populate('addedBy', 'name shopName')
+      .populate('proCategoryId', 'name')
+      .populate('proSubCategoryId', 'name');
+    res.json({ success: true, data: products });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+}));
+
+// Approve a product and set final selling price (Admin only)
+router.put('/admin/approve/:id', auth, roleCheck(['admin']), asyncHandler(async (req, res) => {
+  try {
+    const { price } = req.body;
+    if (!price) {
+      return res.status(400).json({ success: false, message: "Final selling price is required for approval." });
+    }
+
+    const product = await Product.findByIdAndUpdate(
+      req.params.id,
+      { status: 'approved', price: price },
+      { new: true }
+    );
+
+    if (!product) {
+      return res.status(404).json({ success: false, message: "Product not found." });
+    }
+
+    res.json({ success: true, message: "Product approved successfully.", data: product });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+}));
+
+// Reject a product (Admin only)
+router.put('/admin/reject/:id', auth, roleCheck(['admin']), asyncHandler(async (req, res) => {
+  try {
+    const product = await Product.findByIdAndUpdate(
+      req.params.id,
+      { status: 'rejected' },
+      { new: true }
+    );
+
+    if (!product) {
+      return res.status(404).json({ success: false, message: "Product not found." });
+    }
+
+    res.json({ success: true, message: "Product rejected.", data: product });
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });
   }

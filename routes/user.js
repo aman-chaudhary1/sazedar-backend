@@ -12,9 +12,13 @@ const multer = require('multer');
 const { uploadUserProfile } = require('../uploadFile');
 const cloudinary = require('../config/cloudinary');
 const { sendOtpEmail } = require('../utility/emailService');
+const roleCheck = require('../middleware/roleMiddleware');
 
-// Get all users
-router.get('/', asyncHandler(async (req, res) => {
+// Admin only routes
+const isAdmin = roleCheck(['admin']);
+
+// Get all users (Admin only)
+router.get('/', auth, isAdmin, asyncHandler(async (req, res) => {
     try {
         const users = await User.find().select('-password');
         res.json({ success: true, message: "Users retrieved successfully.", data: users });
@@ -252,14 +256,14 @@ router.post('/login', asyncHandler(async (req, res) => {
         console.log(`Login attempt: ${email}, Status: ${user.userStatus}`);
 
         // Check user status
-        if (user.userStatus === 'inactive') {
-            console.log(`Blocked login attempt for inactive user: ${email}`);
+        if (user.userStatus === 'inactive' || (user.role === 'shopkeeper' && user.shopStatus === 'inactive')) {
+            console.log(`Blocked login attempt for inactive user/shopkeeper: ${email}`);
             return res.status(401).json({ success: false, message: "Your account has been deactivated. Please contact support." });
         }
 
         // Generate JWT token
         const token = jwt.sign(
-            { id: user._id },
+            { id: user._id, role: user.role },
             process.env.JWT_SECRET || 'your-secret-key',
             { expiresIn: '30d' }
         );
@@ -270,11 +274,14 @@ router.post('/login', asyncHandler(async (req, res) => {
             message: "Login successful.",
             data: {
                 user: {
-                    id: user._id,
+                    _id: user._id,
                     name: user.name,
                     email: user.email,
                     phoneNo: user.phoneNo,
-                    profileImage: user.profileImage
+                    profileImage: user.profileImage,
+                    role: user.role,
+                    shopName: user.shopName,
+                    shopAddress: user.shopAddress
                 },
                 token
             }
@@ -618,10 +625,10 @@ router.post('/reset-password', asyncHandler(async (req, res) => {
 }));
 
 // Update a user by ID (for admin use)
-router.put('/:id', asyncHandler(async (req, res) => {
+router.put('/:id', auth, isAdmin, asyncHandler(async (req, res) => {
     try {
         const userID = req.params.id;
-        const { name, email, phoneNo, userStatus } = req.body;
+        const { name, email, phoneNo, userStatus, shopStatus, role, assignedCategories } = req.body;
         const user = await User.findById(userID);
 
         if (!user) {
@@ -632,6 +639,9 @@ router.put('/:id', asyncHandler(async (req, res) => {
         if (email) user.email = email;
         if (phoneNo !== undefined) user.phoneNo = phoneNo;
         if (userStatus) user.userStatus = userStatus;
+        if (role) user.role = role;
+        if (shopStatus) user.shopStatus = shopStatus;
+        if (assignedCategories) user.assignedCategories = assignedCategories;
 
         await user.save();
         res.json({ success: true, message: "User updated successfully.", data: user });

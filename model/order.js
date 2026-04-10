@@ -40,8 +40,20 @@ const orderSchema = new mongoose.Schema({
       unit: {
         type: String,
       },
+      vendorId: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'User'
+      },
+      shopkeeperPrice: {
+        type: Number
+      }
     }
   ],
+  shopkeeperId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'User',
+    default: null
+  },
   totalPrice: {
     type: Number,
     required: true
