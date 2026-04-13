@@ -628,7 +628,7 @@ router.post('/reset-password', asyncHandler(async (req, res) => {
 router.put('/:id', auth, isAdmin, asyncHandler(async (req, res) => {
     try {
         const userID = req.params.id;
-        const { name, email, phoneNo, userStatus, shopStatus, role, assignedCategories } = req.body;
+        const { name, email, phoneNo, userStatus, shopStatus, role, assignedCategories, assignedSubCategories } = req.body;
         const user = await User.findById(userID);
 
         if (!user) {
@@ -642,6 +642,7 @@ router.put('/:id', auth, isAdmin, asyncHandler(async (req, res) => {
         if (role) user.role = role;
         if (shopStatus) user.shopStatus = shopStatus;
         if (assignedCategories) user.assignedCategories = assignedCategories;
+        if (assignedSubCategories) user.assignedSubCategories = assignedSubCategories;
 
         await user.save();
         res.json({ success: true, message: "User updated successfully.", data: user });

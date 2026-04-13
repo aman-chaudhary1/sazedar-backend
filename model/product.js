@@ -82,6 +82,14 @@ const productSchema = new mongoose.Schema({
     shopkeeperPrice: {
         type: Number,
         default: 0
+    },
+    shopkeeperOfferPrice: {
+        type: Number,
+        default: 0
+    },
+    rejectionReason: {
+        type: String,
+        default: ""
     }
 }, { timestamps: true });
 

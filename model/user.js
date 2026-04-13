@@ -48,6 +48,10 @@ const userSchema = new mongoose.Schema({
     type: mongoose.Schema.Types.ObjectId,
     ref: 'Category'
   }],
+  assignedSubCategories: [{
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'SubCategory'
+  }],
   shopStatus: {
     type: String,
     enum: ['active', 'inactive'],

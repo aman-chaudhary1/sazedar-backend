@@ -12,26 +12,50 @@ const roleCheck = require('../middleware/roleMiddleware');
 router.get('/', asyncHandler(async (req, res) => {
   try {
     const filter = {};
-    if (req.query.status && req.query.status !== 'all') {
-      filter.status = req.query.status;
-    } else if (!req.query.status) {
-      // Default to approved for public, but we'll let admin see more if they want.
-      // For the sake of fixing the dashboard immediately, let's just remove the strict filter 
-      // if no query is provided, or default to all for now.
+    // 1. Core Safety Filter (Default for Customers/Dashboard)
+    filter.status = { $nin: ['pending', 'rejected'] };
+
+    // 2. Admin Override (Only if authorized and requested)
+    const token = req.headers.authorization?.split(' ')[1];
+    if (token) {
+      try {
+        const jwt = require('jsonwebtoken');
+        const decoded = jwt.verify(token, process.env.JWT_SECRET || 'your-secret-key');
+        const User = require('../model/user');
+        const user = await User.findById(decoded.id);
+
+        if (user && user.role === 'admin') {
+          if (req.query.status === 'all') {
+            delete filter.status; // Admin sees everything
+          } else if (req.query.status) {
+            filter.status = req.query.status; // Admin filters by specific status
+          }
+        }
+      } catch (err) {
+        // Token invalid, proceed with safety filter
+      }
     }
 
-    // Optional filter to get only today's special products: /products?todaysSpecial=true
+    // 3. Attribute Filters (Inherit safety filter)
     if (req.query.todaysSpecial === 'true') {
       filter.todaysSpecial = true;
     }
+    if (req.query.proCategoryId) {
+      filter.proCategoryId = req.query.proCategoryId;
+    }
+    if (req.query.proSubCategoryId) {
+      filter.proSubCategoryId = req.query.proSubCategoryId;
+    }
 
-    console.log('🔹 [GET PRODUCTS] Filter:', filter);
+    console.log('🔹 [GET PRODUCTS] Final Filter:', JSON.stringify(filter));
     const products = await Product.find(filter)
-      .populate('proCategoryId', 'id name')
-      .populate('proSubCategoryId', 'id name')
-      .populate('proBrandId', 'id name')
-      .populate('proVariantTypeId', 'id type')
-      .populate('proVariantId', 'id name');
+      .populate('proCategoryId', 'name')
+      .populate('proSubCategoryId', 'name')
+      .populate('proBrandId', 'name')
+      .populate('proVariantTypeId', 'type')
+      .populate('proVariantId', 'name')
+      .populate('addedBy', 'name shopName');
+
     res.json({ success: true, message: "Products retrieved successfully.", data: products });
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });
@@ -43,11 +67,13 @@ router.get('/:id', asyncHandler(async (req, res) => {
   try {
     const productID = req.params.id;
     const product = await Product.findById(productID)
-      .populate('proCategoryId', 'id name')
-      .populate('proSubCategoryId', 'id name')
-      .populate('proBrandId', 'id name')
-      .populate('proVariantTypeId', 'id name')
-      .populate('proVariantId', 'id name');
+      .populate('proCategoryId', 'name')
+      .populate('proSubCategoryId', 'name')
+      .populate('proBrandId', 'name')
+      .populate('proVariantTypeId', 'name')
+      .populate('proVariantId', 'name')
+      .populate('addedBy', 'name shopName');
+
     if (!product) {
       return res.status(404).json({ success: false, message: "Product not found." });
     }
@@ -76,6 +102,20 @@ router.post('/', asyncHandler(async (req, res) => {
     }
 
     try {
+      const token = req.headers.authorization?.split(' ')[1];
+      let user = null;
+
+      if (token) {
+        try {
+          const jwt = require('jsonwebtoken');
+          const decoded = jwt.verify(token, process.env.JWT_SECRET || 'your-secret-key');
+          const User = require('../model/user');
+          user = await User.findById(decoded.id);
+        } catch (err) {
+          // Token invalid or expired
+        }
+      }
+
       console.log('🔹 [CREATE PRODUCT] Request Body:', req.body);
       console.log('🔹 [CREATE PRODUCT] Request Files:', req.files ? Object.keys(req.files) : 'No files');
 
@@ -92,21 +132,22 @@ router.post('/', asyncHandler(async (req, res) => {
         proVariantTypeId,
         proVariantId,
         unit,
-        productSize
+        productSize,
+        shopkeeperPrice
       } = req.body;
 
-      // Only these fields are strictly required
-      if (!name || !quantity || !price || !proCategoryId) {
-        return res.status(400).json({ success: false, message: "Required fields are missing." });
+      // Only these fields are strictly required (Allow 0 for quantity)
+      if (!name || isNaN(Number(quantity)) || !price || !proCategoryId) {
+        return res.status(400).json({ success: false, message: "Required fields are missing or invalid." });
       }
 
-      // Normalize offerPrice so that empty / "null" does not try to cast to Number
+      // Normalize numbers
+      const parsedQuantity = Number(quantity);
+      const parsedPrice = Number(price);
+      const parsedShopkeeperPrice = shopkeeperPrice ? Number(shopkeeperPrice) : 0;
       const parsedOfferPrice = (offerPrice === undefined || offerPrice === null || offerPrice === '' || offerPrice === 'null')
         ? undefined
         : Number(offerPrice);
-      if (parsedOfferPrice !== undefined && Number.isNaN(parsedOfferPrice)) {
-        return res.status(400).json({ success: false, message: "offerPrice must be a number." });
-      }
 
       const imageUrls = [];
       const fields = ['image1', 'image2', 'image3', 'image4', 'image5'];
@@ -129,12 +170,29 @@ router.post('/', asyncHandler(async (req, res) => {
         }
       }
 
+      // Smart Defaults based on user role
+      let finalStatus = 'approved';
+      let addedById = null;
+
+      if (user) {
+        if (user.role === 'shopkeeper') {
+          finalStatus = 'pending';
+          addedById = user._id;
+        } else if (user.role === 'admin') {
+          finalStatus = 'approved';
+          addedById = null;
+        }
+      }
+
       const newProduct = new Product({
         name,
         description,
-        quantity,
-        price,
+        quantity: parsedQuantity,
+        price: parsedPrice,
         offerPrice: parsedOfferPrice,
+        shopkeeperPrice: parsedShopkeeperPrice,
+        status: finalStatus,
+        addedBy: addedById,
         todaysSpecial: todaysSpecial === 'true' || todaysSpecial === true,
         proCategoryId,
         proSubCategoryId: proSubCategoryId || null,
@@ -157,6 +215,7 @@ router.post('/', asyncHandler(async (req, res) => {
       });
 
     } catch (error) {
+
       console.error("Error creating product:", error);
       res.status(500).json({ success: false, message: error.message });
     }
@@ -183,9 +242,29 @@ router.put('/:id', asyncHandler(async (req, res) => {
     }
 
     try {
+      const token = req.headers.authorization?.split(' ')[1];
+      let user = null;
+      if (token) {
+        try {
+          const jwt = require('jsonwebtoken');
+          const decoded = jwt.verify(token, process.env.JWT_SECRET || 'your-secret-key');
+          const User = require('../model/user');
+          user = await User.findById(decoded.id);
+        } catch (err) {
+          return res.status(401).json({ success: false, message: "Invalid or expired token." });
+        }
+      } else {
+        return res.status(401).json({ success: false, message: "Authorization token required." });
+      }
+
       const product = await Product.findById(productId);
       if (!product) {
         return res.status(404).json({ success: false, message: "Product not found." });
+      }
+
+      // 🔐 Security Check: Only Owner or Admin can update
+      if (user.role === 'shopkeeper' && product.addedBy?.toString() !== user._id.toString()) {
+        return res.status(403).json({ success: false, message: "Unauthorized: You can only update your own products." });
       }
 
       console.log('🔸 [UPDATE PRODUCT] Product ID:', productId);
@@ -206,7 +285,9 @@ router.put('/:id', asyncHandler(async (req, res) => {
         proVariantTypeId,
         proVariantId,
         unit,
-        productSize
+        productSize,
+        shopkeeperPrice,
+        shopkeeperOfferPrice
       } = req.body;
 
       product.name = name || product.name;
@@ -247,8 +328,25 @@ router.put('/:id', asyncHandler(async (req, res) => {
           product.productSize = updatedSize;
         }
       }
+
+      // Shopkeeper suggested prices
+      if (typeof shopkeeperPrice !== 'undefined') {
+        product.shopkeeperPrice = Number(shopkeeperPrice) || 0;
+      }
+      if (typeof shopkeeperOfferPrice !== 'undefined') {
+        product.shopkeeperOfferPrice = Number(shopkeeperOfferPrice) || 0;
+      }
+
       if (typeof req.body.isAvailable !== 'undefined') {
         product.isAvailable = req.body.isAvailable === 'true' || req.body.isAvailable === true;
+      }
+
+      // 🔄 Status Reset: If shopkeeper updates, set back to pending
+      if (user.role === 'shopkeeper') {
+        product.status = 'pending';
+        // Update price/offerPrice as suggestions for administrative review
+        if (typeof shopkeeperPrice !== 'undefined') product.price = Number(shopkeeperPrice);
+        if (typeof shopkeeperOfferPrice !== 'undefined') product.offerPrice = Number(shopkeeperOfferPrice) || undefined;
       }
 
       const fields = ['image1', 'image2', 'image3', 'image4', 'image5'];
@@ -288,14 +386,86 @@ router.put('/:id', asyncHandler(async (req, res) => {
   });
 }));
 
+// Update only Availability
+router.put('/availability/:id', asyncHandler(async (req, res) => {
+  const productID = req.params.id;
+  const { isAvailable } = req.body;
+
+  if (typeof isAvailable === 'undefined') {
+    return res.status(400).json({ success: false, message: "isAvailable field is required." });
+  }
+
+  try {
+    const token = req.headers.authorization?.split(' ')[1];
+    let user = null;
+    if (token) {
+      try {
+        const jwt = require('jsonwebtoken');
+        const decoded = jwt.verify(token, process.env.JWT_SECRET || 'your-secret-key');
+        const User = require('../model/user');
+        user = await User.findById(decoded.id);
+      } catch (err) {
+        return res.status(401).json({ success: false, message: "Invalid or expired token." });
+      }
+    } else {
+      return res.status(401).json({ success: false, message: "Authorization token required." });
+    }
+
+    const product = await Product.findById(productID);
+    if (!product) {
+      return res.status(404).json({ success: false, message: "Product not found." });
+    }
+
+    // 🔐 Security Check: Only Owner or Admin can update
+    if (user.role === 'shopkeeper' && product.addedBy?.toString() !== user._id.toString()) {
+      return res.status(403).json({ success: false, message: "Unauthorized: You can only update your own products." });
+    }
+
+    product.isAvailable = isAvailable === 'true' || isAvailable === true;
+    // ⚠️ Note: We explicitly do NOT touch the 'status' field here.
+    
+    await product.save();
+
+    res.json({ 
+      success: true, 
+      message: `Product marked as ${product.isAvailable ? 'In Stock' : 'Out of Stock'}.`,
+      data: product 
+    });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+}));
+
 // Delete a product
 router.delete('/:id', asyncHandler(async (req, res) => {
   const productID = req.params.id;
   try {
-    const product = await Product.findByIdAndDelete(productID);
+    const token = req.headers.authorization?.split(' ')[1];
+    let user = null;
+    if (token) {
+      try {
+        const jwt = require('jsonwebtoken');
+        const decoded = jwt.verify(token, process.env.JWT_SECRET || 'your-secret-key');
+        const User = require('../model/user');
+        user = await User.findById(decoded.id);
+      } catch (err) {
+        return res.status(401).json({ success: false, message: "Invalid or expired token." });
+      }
+    } else {
+      return res.status(401).json({ success: false, message: "Authorization token required." });
+    }
+
+    const product = await Product.findById(productID);
     if (!product) {
       return res.status(404).json({ success: false, message: "Product not found." });
     }
+
+    // 🔐 Security Check: Only Owner or Admin can delete
+    if (user.role === 'shopkeeper' && product.addedBy?.toString() !== user._id.toString()) {
+      return res.status(403).json({ success: false, message: "Unauthorized: You can only delete your own products." });
+    }
+
+    await Product.findByIdAndDelete(productID);
     res.json({ success: true, message: "Product deleted successfully." });
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });
@@ -318,14 +488,14 @@ router.get('/admin/pending', auth, roleCheck(['admin']), asyncHandler(async (req
 // Approve a product and set final selling price (Admin only)
 router.put('/admin/approve/:id', auth, roleCheck(['admin']), asyncHandler(async (req, res) => {
   try {
-    const { price } = req.body;
+    const { price, offerPrice } = req.body;
     if (!price) {
       return res.status(400).json({ success: false, message: "Final selling price is required for approval." });
     }
 
     const product = await Product.findByIdAndUpdate(
       req.params.id,
-      { status: 'approved', price: price },
+      { status: 'approved', price: price, offerPrice: offerPrice || undefined },
       { new: true }
     );
 
@@ -342,9 +512,10 @@ router.put('/admin/approve/:id', auth, roleCheck(['admin']), asyncHandler(async 
 // Reject a product (Admin only)
 router.put('/admin/reject/:id', auth, roleCheck(['admin']), asyncHandler(async (req, res) => {
   try {
+    const { reason } = req.body;
     const product = await Product.findByIdAndUpdate(
       req.params.id,
-      { status: 'rejected' },
+      { status: 'rejected', rejectionReason: reason || "No reason provided" },
       { new: true }
     );
 
