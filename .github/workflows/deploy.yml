@@ -1,0 +1,124 @@
+name: Deploy to Remote Docker Host
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+concurrency:
+  group: production-deploy
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    name: Build and deploy via SSH
+    runs-on: ubuntu-latest
+    env:
+      REMOTE_APP_DIR: /opt/sazedar-backend
+      REMOTE_CONTAINER_NAME: sazedar-backend
+      REMOTE_IMAGE_NAME: sazedar-backend:latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install sshpass
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y sshpass
+
+      - name: Create deployment archive
+        run: |
+          tar -czf source.tar.gz --exclude=.git --exclude=.github --exclude=node_modules .
+
+      - name: Create runtime env file
+        env:
+          MONGO_URL: ${{ secrets.MONGO_URL }}
+          JWT_SECRET: ${{ secrets.JWT_SECRET }}
+          BASE_URL: ${{ secrets.BASE_URL }}
+          CLOUDINARY_CLOUD_NAME: ${{ secrets.CLOUDINARY_CLOUD_NAME }}
+          CLOUDINARY_API_KEY: ${{ secrets.CLOUDINARY_API_KEY }}
+          CLOUDINARY_API_SECRET: ${{ secrets.CLOUDINARY_API_SECRET }}
+          FIREBASE_SERVICE_ACCOUNT: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
+          BREVO_API_KEY: ${{ secrets.BREVO_API_KEY }}
+          EMAIL_USER: ${{ secrets.EMAIL_USER }}
+          STRIPE_SKRT_KET_TST: ${{ secrets.STRIPE_SKRT_KET_TST }}
+          STRIPE_PBLK_KET_TST: ${{ secrets.STRIPE_PBLK_KET_TST }}
+          RAZORPAY_KEY_TEST: ${{ secrets.RAZORPAY_KEY_TEST }}
+        run: |
+          {
+            printf 'NODE_ENV=production\n'
+            printf 'PORT=3000\n'
+            printf 'MONGO_URL=%s\n' "$MONGO_URL"
+            printf 'JWT_SECRET=%s\n' "$JWT_SECRET"
+            printf 'BASE_URL=%s\n' "$BASE_URL"
+            printf 'CLOUDINARY_CLOUD_NAME=%s\n' "$CLOUDINARY_CLOUD_NAME"
+            printf 'CLOUDINARY_API_KEY=%s\n' "$CLOUDINARY_API_KEY"
+            printf 'CLOUDINARY_API_SECRET=%s\n' "$CLOUDINARY_API_SECRET"
+            printf 'FIREBASE_SERVICE_ACCOUNT=%s\n' "$FIREBASE_SERVICE_ACCOUNT"
+            printf 'BREVO_API_KEY=%s\n' "$BREVO_API_KEY"
+            printf 'EMAIL_USER=%s\n' "$EMAIL_USER"
+            printf 'STRIPE_SKRT_KET_TST=%s\n' "$STRIPE_SKRT_KET_TST"
+            printf 'STRIPE_PBLK_KET_TST=%s\n' "$STRIPE_PBLK_KET_TST"
+            printf 'RAZORPAY_KEY_TEST=%s\n' "$RAZORPAY_KEY_TEST"
+          } > .deploy.env
+
+      - name: Upload deployment files to remote host
+        env:
+          REMOTE_SSH_HOST: ${{ secrets.REMOTE_SSH_HOST }}
+          REMOTE_SSH_USER: ${{ secrets.REMOTE_SSH_USER }}
+          REMOTE_SSH_PASSWORD: ${{ secrets.REMOTE_SSH_PASSWORD }}
+        run: |
+          sshpass -p "$REMOTE_SSH_PASSWORD" scp -o StrictHostKeyChecking=no source.tar.gz .deploy.env "$REMOTE_SSH_USER@$REMOTE_SSH_HOST:/tmp/"
+
+      - name: Build Docker image and restart container on remote host
+        env:
+          REMOTE_SSH_HOST: ${{ secrets.REMOTE_SSH_HOST }}
+          REMOTE_SSH_USER: ${{ secrets.REMOTE_SSH_USER }}
+          REMOTE_SSH_PASSWORD: ${{ secrets.REMOTE_SSH_PASSWORD }}
+        run: |
+          sshpass -p "$REMOTE_SSH_PASSWORD" ssh -o StrictHostKeyChecking=no "$REMOTE_SSH_USER@$REMOTE_SSH_HOST" 'bash -s' <<'EOF'
+            set -Eeuo pipefail
+
+            APP_DIR="/opt/sazedar-backend"
+            RELEASE_DIR="$APP_DIR/current"
+            ENV_FILE="$APP_DIR/.env"
+            ARCHIVE_FILE="/tmp/source.tar.gz"
+            UPLOADED_ENV_FILE="/tmp/.deploy.env"
+            CONTAINER_NAME="sazedar-backend"
+            IMAGE_NAME="sazedar-backend:latest"
+
+            mkdir -p "$APP_DIR"
+            rm -rf "$RELEASE_DIR"
+            mkdir -p "$RELEASE_DIR"
+
+            tar -xzf "$ARCHIVE_FILE" -C "$RELEASE_DIR"
+            mv "$UPLOADED_ENV_FILE" "$ENV_FILE"
+            rm -f "$ARCHIVE_FILE"
+
+            cd "$RELEASE_DIR"
+            docker build -t "$IMAGE_NAME" .
+
+            docker rm -f "$CONTAINER_NAME" || true
+
+            docker run -d \
+              --name "$CONTAINER_NAME" \
+              --restart unless-stopped \
+              --env-file "$ENV_FILE" \
+              -p 3000:3000 \
+              "$IMAGE_NAME"
+
+            sleep 10
+
+            if ! docker ps --filter "name=^/${CONTAINER_NAME}$" --filter "status=running" --format '{{.Names}}' | grep -q "^${CONTAINER_NAME}$"; then
+              docker logs --tail 100 "$CONTAINER_NAME" || true
+              exit 1
+            fi
+
+            if command -v curl >/dev/null 2>&1; then
+              curl -fsS http://127.0.0.1:3000/ >/dev/null
+            fi
+
+            docker image prune -f >/dev/null 2>&1 || true
+          EOF
