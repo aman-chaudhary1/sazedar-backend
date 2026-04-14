@@ -258,7 +258,7 @@ router.post('/login', asyncHandler(async (req, res) => {
         // Check user status
         if (user.userStatus === 'inactive' || (user.role === 'shopkeeper' && user.shopStatus === 'inactive')) {
             console.log(`Blocked login attempt for inactive user/shopkeeper: ${email}`);
-            return res.status(401).json({ success: false, message: "Your account has been deactivated. Please contact support." });
+            return res.status(401).json({ success: false, message: "Your account has been deactivated. Please contact us at gravito34678@gmail.com or call 7302656291 for assistance." });
         }
 
         // Generate JWT token

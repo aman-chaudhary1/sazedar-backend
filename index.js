@@ -125,6 +125,7 @@ app.use('/api/address', require('./routes/address'));
 app.use('/api/rural-areas', require('./routes/ruralArea'));
 app.use('/cart', require('./routes/cart'));
 app.use('/favorites', require('./routes/favorite'));
+app.use('/app-version', require('./routes/appVersion'));
 
 /* ======================
    HEALTH CHECK
