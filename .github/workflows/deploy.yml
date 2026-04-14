@@ -30,7 +30,13 @@ jobs:
 
       - name: Create deployment archive
         run: |
-          tar -czf source.tar.gz --exclude=.git --exclude=.github --exclude=node_modules .
+          tar -czf "$RUNNER_TEMP/source.tar.gz" \
+            --exclude=.git \
+            --exclude=.github \
+            --exclude=node_modules \
+            --exclude=source.tar.gz \
+            --exclude=.deploy.env \
+            .
 
       - name: Create runtime env file
         env:
@@ -70,7 +76,7 @@ jobs:
           REMOTE_SSH_USER: ${{ secrets.REMOTE_SSH_USER }}
           REMOTE_SSH_PASSWORD: ${{ secrets.REMOTE_SSH_PASSWORD }}
         run: |
-          sshpass -p "$REMOTE_SSH_PASSWORD" scp -o StrictHostKeyChecking=no source.tar.gz .deploy.env "$REMOTE_SSH_USER@$REMOTE_SSH_HOST:/tmp/"
+          sshpass -p "$REMOTE_SSH_PASSWORD" scp -o StrictHostKeyChecking=no "$RUNNER_TEMP/source.tar.gz" .deploy.env "$REMOTE_SSH_USER@$REMOTE_SSH_HOST:/tmp/"
 
       - name: Build Docker image and restart container on remote host
         env:
