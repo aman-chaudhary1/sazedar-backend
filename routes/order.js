@@ -2,6 +2,7 @@ const express = require('express');
 const asyncHandler = require('express-async-handler');
 const router = express.Router();
 const Order = require('../model/order');
+const AppConfig = require('../model/appConfig');
 const auth = require('../middleware/authMiddleware');
 
 // Get all orders
@@ -75,6 +76,14 @@ router.post('/', asyncHandler(async (req, res) => {
     }
 
     try {
+        // Check if ordering is enabled
+        const config = await AppConfig.findOne();
+        if (config && config.isOrderingEnabled === false) {
+            return res.status(403).json({ 
+                success: false, 
+                message: config.orderBlockedMessage || "Ordering is temporarily disabled." 
+            });
+        }
         const order = new Order({ 
             userID, 
             orderStatus, 

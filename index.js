@@ -126,6 +126,8 @@ app.use('/api/rural-areas', require('./routes/ruralArea'));
 app.use('/cart', require('./routes/cart'));
 app.use('/favorites', require('./routes/favorite'));
 app.use('/app-version', require('./routes/appVersion'));
+app.use('/app-config', require('./routes/appConfig'));
+app.use('/reviews', require('./routes/review'));
 
 /* ======================
    HEALTH CHECK
