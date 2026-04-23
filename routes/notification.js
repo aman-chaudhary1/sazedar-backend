@@ -75,9 +75,8 @@ router.post('/send-notification', asyncHandler(async (req, res) => {
 }));
 
 router.get('/track-notification/:id', asyncHandler(async (req, res) => {
-    // Tracking individual FCM messages is more complex and requires BigQuery export or basic console checks.
-    // For now, returning a static success response as FCM doesn't provide per-message stats via API easily like OneSignal.
-    res.json({ success: true, message: 'Tracking not fully supported with basic FCM', data: { platform: 'Android', success_delivery: 0 } });
+    // Basic success response to avoid errors if this legacy endpoint is called.
+    res.json({ success: true, message: 'Tracking handled via read-by status', data: null });
 }));
 
 
