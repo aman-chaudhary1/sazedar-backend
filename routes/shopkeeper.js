@@ -1,6 +1,8 @@
 const express = require('express');
 const asyncHandler = require('express-async-handler');
 const router = express.Router();
+const mongoose = require('mongoose');
+console.log('✅ Shopkeeper Routes Ready');
 const User = require('../model/user');
 const Product = require('../model/product');
 const Category = require('../model/category');
@@ -134,24 +136,29 @@ router.get('/my-products', auth, isShopkeeper, asyncHandler(async (req, res) => 
 // Get orders for the current shopkeeper
 
 router.get('/my-orders', auth, isShopkeeper, asyncHandler(async (req, res) => {
+    console.log('--- Shopkeeper My-Orders Request ---');
     try {
         const orders = await Order.find({ 'items.vendorId': req.user._id })
             .populate('items.productID')
             .populate('userID', 'name email phoneNo');
         
+        console.log(`Found ${orders.length} orders for shopkeeper ${req.user._id}`);
+
         // Filter items in each order to only show those belonging to this vendor
         const vendorOrders = orders.map(order => {
-            const vendorItems = order.items.filter(item => 
+            const vendorItems = (order.items || []).filter(item => 
                 item.vendorId && item.vendorId.toString() === req.user._id.toString()
             );
             return {
-                ...order._doc,
+                ...order.toObject(),
                 items: vendorItems
             };
         });
 
+        console.log('Filtering complete. Sending shopkeeper orders.');
         res.json({ success: true, data: vendorOrders });
     } catch (error) {
+        console.error('Error in shopkeeper/my-orders:', error);
         res.status(500).json({ success: false, message: error.message });
     }
 }));
