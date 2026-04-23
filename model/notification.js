@@ -21,6 +21,15 @@ const notificationSchema = new mongoose.Schema({
         type: String,
         trim: true
     },
+    userId: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'User',
+        default: null // null means sent to all users
+    },
+    readBy: [{
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'User'
+    }]
 }, { timestamps: true });
 
 // Create the Notification model

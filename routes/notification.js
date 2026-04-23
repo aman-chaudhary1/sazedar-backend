@@ -58,7 +58,13 @@ router.post('/send-notification', asyncHandler(async (req, res) => {
         }
 
         const notificationId = response.split('/').pop();
-        const notification = new Notification({ notificationId, title, description, imageUrl });
+        const notification = new Notification({ 
+            notificationId, 
+            title, 
+            description, 
+            imageUrl,
+            userId: userId || null // Store userId if it's a targeted notification
+        });
         await notification.save();
 
         res.json({ success: true, message: 'Notification sent successfully', data: null });
@@ -77,7 +83,22 @@ router.get('/track-notification/:id', asyncHandler(async (req, res) => {
 
 router.get('/all-notification', asyncHandler(async (req, res) => {
     try {
-        const notifications = await Notification.find({}).sort({ _id: -1 });
+        const { userId } = req.query;
+        let query = {};
+        
+        if (userId) {
+            // Fetch notifications for THIS user OR global notifications (userId: null)
+            query = { 
+                $or: [
+                    { userId: userId },
+                    { userId: null }
+                ]
+            };
+        }
+
+        const notifications = await Notification.find(query)
+            .populate('userId', 'name email') // Populate user details
+            .sort({ _id: -1 });
         res.json({ success: true, message: "Notifications retrieved successfully.", data: notifications });
     } catch (error) {
         res.status(500).json({ success: false, message: error.message });
@@ -87,8 +108,29 @@ router.get('/all-notification', asyncHandler(async (req, res) => {
 // Added alias for the dashboard to fix 404
 router.get('/', asyncHandler(async (req, res) => {
     try {
-        const notifications = await Notification.find({}).sort({ _id: -1 });
+        const notifications = await Notification.find({})
+            .populate('userId', 'name email')
+            .sort({ _id: -1 });
         res.json({ success: true, message: "Notifications retrieved successfully.", data: notifications });
+    } catch (error) {
+        res.status(500).json({ success: false, message: error.message });
+    }
+}));
+
+
+router.post('/mark-as-read', asyncHandler(async (req, res) => {
+    const { notificationId, userId } = req.body;
+    try {
+        const notification = await Notification.findById(notificationId);
+        if (!notification) {
+            return res.status(404).json({ success: false, message: "Notification not found." });
+        }
+
+        if (!notification.readBy.includes(userId)) {
+            notification.readBy.push(userId);
+            await notification.save();
+        }
+        res.json({ success: true, message: "Marked as read successfully." });
     } catch (error) {
         res.status(500).json({ success: false, message: error.message });
     }
