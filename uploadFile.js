@@ -17,7 +17,7 @@ const storageCategory = multer.diskStorage({
 
 const uploadCategory = multer({
   storage: storageCategory,
-  limits: { fileSize: 5 * 1024 * 1024 },
+  limits: { fileSize: 15 * 1024 * 1024 },
 });
 
 
@@ -37,7 +37,7 @@ const storageProduct = multer.diskStorage({
 
 const uploadProduct = multer({
   storage: storageProduct,
-  limits: { fileSize: 5 * 1024 * 1024 },
+  limits: { fileSize: 15 * 1024 * 1024 },
 });
 
 
@@ -48,7 +48,7 @@ const storagePoster = multer.memoryStorage(); // 🔥 IMPORTANT
 
 const uploadPosters = multer({
   storage: storagePoster,
-  limits: { fileSize: 5 * 1024 * 1024 },
+  limits: { fileSize: 15 * 1024 * 1024 },
 });
 
 /* =========================
@@ -59,7 +59,7 @@ const storageUserProfile = multer.memoryStorage();
 const uploadUserProfile = multer({
   storage: storageUserProfile,
   limits: { 
-    fileSize: 5 * 1024 * 1024 // 5MB
+    fileSize: 15 * 1024 * 1024 // 15MB
   },
   fileFilter: (req, file, cb) => {
     // Only accept image files
@@ -76,6 +76,7 @@ module.exports = {
   uploadProduct,
   uploadPosters,
   uploadUserProfile,
+  uploadProductMemory: uploadUserProfile, // Alias for consistency if they share limits, or create new
 };
 
 

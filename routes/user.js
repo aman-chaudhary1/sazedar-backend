@@ -231,6 +231,66 @@ router.post('/register', (req, res, next) => {
     }
 }));
 
+// Shopkeeper Signup/Register (Direct registration for Shopkeeper App)
+router.post('/register-shopkeeper', asyncHandler(async (req, res) => {
+    const { name, email, password, shopName, shopAddress, phoneNo } = req.body;
+
+    if (!name || !email || !password || !shopName || !shopAddress) {
+        return res.status(400).json({ 
+            success: false, 
+            message: "Name, email, password, shop name, and shop address are required." 
+        });
+    }
+
+    try {
+        // Check if user already exists
+        const existingUser = await User.findOne({ email });
+        if (existingUser) {
+            return res.status(400).json({ 
+                success: false, 
+                message: "A user with this email already exists." 
+            });
+        }
+
+        // Hash password
+        const salt = await bcrypt.genSalt(10);
+        const hashedPassword = await bcrypt.hash(password, salt);
+
+        // Create new shopkeeper
+        const user = new User({
+            name,
+            email,
+            password: hashedPassword,
+            phoneNo: phoneNo || null,
+            role: 'shopkeeper',
+            shopName,
+            shopAddress,
+            shopStatus: 'active', // Default to active, can be changed by admin
+            userStatus: 'active'
+        });
+
+        const newUser = await user.save();
+
+        res.status(201).json({
+            success: true,
+            message: "Shopkeeper registered successfully. You can now login.",
+            data: {
+                id: newUser._id,
+                name: newUser.name,
+                email: newUser.email,
+                role: newUser.role,
+                shopName: newUser.shopName
+            }
+        });
+    } catch (error) {
+        console.error("Shopkeeper registration error:", error);
+        if (error.code === 11000) {
+            return res.status(400).json({ success: false, message: "Email already exists." });
+        }
+        res.status(500).json({ success: false, message: error.message });
+    }
+}));
+
 // User Login
 router.post('/login', asyncHandler(async (req, res) => {
     const { email, password } = req.body;
