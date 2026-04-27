@@ -34,7 +34,10 @@ console.log('SERVER BASE URL:', BASE_URL);
 ====================== */
 
 app.use(cors({
-  origin: '*', // later restrict to admin panel domain
+  origin: '*',
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'Accept'],
+  credentials: true
 }));
 
 app.use(bodyParser.json({ limit: '10mb' }));
