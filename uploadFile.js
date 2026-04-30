@@ -8,8 +8,8 @@ const storageCategory = multer.diskStorage({
   destination: (req, file, cb) => cb(null, './public/category'),
   filename: (req, file, cb) => {
     const ext = path.extname(file.originalname).toLowerCase();
-    if (!/\.jpe?g|\.png/.test(ext)) {
-      return cb(new Error('Only jpg, jpeg, png allowed'));
+    if (!/\.(jpe?g|png|webp)$/i.test(ext)) {
+      return cb(new Error('Only jpg, jpeg, png, webp allowed'));
     }
     cb(null, Date.now() + "_" + Math.random().toString(36).substring(7) + ext);
   }
@@ -28,8 +28,8 @@ const storageProduct = multer.diskStorage({
   destination: (req, file, cb) => cb(null, './public/products'),
   filename: (req, file, cb) => {
     const ext = path.extname(file.originalname).toLowerCase();
-    if (!/\.jpe?g|\.png/.test(ext)) {
-      return cb(new Error('Only jpg, jpeg, png allowed'));
+    if (!/\.(jpe?g|png|webp)$/i.test(ext)) {
+      return cb(new Error('Only jpg, jpeg, png, webp allowed'));
     }
     cb(null, Date.now() + "_" + file.originalname);
   }

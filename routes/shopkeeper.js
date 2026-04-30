@@ -134,52 +134,43 @@ router.get('/my-products', auth, isShopkeeper, asyncHandler(async (req, res) => 
 
 
 
-// Get orders for the current shopkeeper
-
-router.get('/my-orders', auth, isShopkeeper, asyncHandler(async (req, res) => {
-    console.log('--- Shopkeeper My-Orders Request ---');
-    console.log('Shopkeeper ID:', req.user._id);
-    
-    if (!Order) {
-        console.error('Order model is not loaded!');
-        return res.status(500).json({ success: false, message: "Server configuration error: Order model missing." });
-    }
-
+// TEST ROUTE: To verify if the Order model is working in this file
+router.get('/test-ping', auth, isShopkeeper, asyncHandler(async (req, res) => {
     try {
-        // Use mongoose.Types.ObjectId to ensure correct type for query
-        const shopkeeperObjectId = new mongoose.Types.ObjectId(req.user._id);
+        const count = await Order.countDocuments();
+        res.json({ success: true, message: "Order model is connected", count });
+    } catch (e) {
+        res.status(500).json({ success: false, error: e.message });
+    }
+}));
+
+// Get orders for the current shopkeeper (RENAMED TO AVOID CONFLICTS)
+router.get('/vendor-orders-list', auth, isShopkeeper, asyncHandler(async (req, res) => {
+    console.log('--- [DEBUG] vendor-orders-list Reached ---');
+    try {
+        const shopkeeperId = req.user._id;
         
-        console.log('Querying for vendorId:', shopkeeperObjectId);
-        const orders = await Order.find({ 'items.vendorId': shopkeeperObjectId })
+        // Use the Order model imported at top of file
+        const orders = await Order.find({ 'items.vendorId': shopkeeperId })
             .populate('items.productID')
             .populate('userID', 'name email phoneNo')
             .sort({ orderDate: -1 })
             .lean();
-        
-        console.log(`Found ${orders.length} orders containing shopkeeper products`);
 
-        // Filter items in each order to only show those belonging to this vendor
+        console.log(`[DEBUG] Found ${orders.length} raw orders for vendor`);
+
         const vendorOrders = orders.map(order => {
-            try {
-                const vendorItems = (order.items || []).filter(item => {
-                    if (!item.vendorId) return false;
-                    return item.vendorId.toString() === req.user._id.toString();
-                });
-                return {
-                    ...order,
-                    items: vendorItems
-                };
-            } catch (innerError) {
-                console.error('Error filtering items for order:', order._id, innerError);
-                return order;
-            }
+            const vendorItems = (order.items || []).filter(item => 
+                item.vendorId && item.vendorId.toString() === shopkeeperId.toString()
+            );
+            return { ...order, items: vendorItems };
         });
 
-        console.log('Filtering complete. Sending shopkeeper orders.');
-        res.json({ success: true, data: vendorOrders });
+        console.log(`[DEBUG] Sending ${vendorOrders.length} filtered orders`);
+        return res.json({ success: true, data: vendorOrders });
     } catch (error) {
-        console.error('CRITICAL ERROR in shopkeeper/my-orders:', error);
-        res.status(500).json({ success: false, message: error.message || "Internal Server Error" });
+        console.error('CRITICAL ERROR in vendor-orders-list:', error);
+        return res.status(500).json({ success: false, message: error.message });
     }
 }));
 

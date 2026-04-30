@@ -3,6 +3,8 @@ const mongoose = require('mongoose');
 const asyncHandler = require('express-async-handler');
 const router = express.Router();
 const Order = require('../model/order');
+const Product = require('../model/product');
+const User = require('../model/user');
 const AppConfig = require('../model/appConfig');
 const auth = require('../middleware/authMiddleware');
 
@@ -85,10 +87,30 @@ router.post('/', asyncHandler(async (req, res) => {
                 message: config.orderBlockedMessage || "Ordering is temporarily disabled." 
             });
         }
+        // Enrich items with vendorId and shopkeeperPrice from the database
+        const enrichedItems = await Promise.all(items.map(async (item) => {
+            const product = await Product.findById(item.productID);
+            if (product) {
+                // If product has no owner (addedBy is missing), default to Admin (first admin found)
+                let vendorId = product.addedBy;
+                if (!vendorId) {
+                    const admin = await User.findOne({ role: 'admin' });
+                    vendorId = admin ? admin._id : null;
+                }
+
+                return {
+                    ...item,
+                    vendorId: vendorId,
+                    shopkeeperPrice: product.shopkeeperOfferPrice || product.shopkeeperPrice || 0
+                };
+            }
+            return item;
+        }));
+
         const order = new Order({ 
             userID, 
             orderStatus, 
-            items, 
+            items: enrichedItems, 
             totalPrice, 
             shippingAddress, 
             paymentMethod, 

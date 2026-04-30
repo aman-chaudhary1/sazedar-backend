@@ -48,15 +48,53 @@ router.get('/', asyncHandler(async (req, res) => {
     }
 
     console.log('🔹 [GET PRODUCTS] Final Filter:', JSON.stringify(filter));
-    const products = await Product.find(filter)
-      .populate('proCategoryId', 'name')
-      .populate('proSubCategoryId', 'name')
-      .populate('proBrandId', 'name')
-      .populate('proVariantTypeId', 'type')
-      .populate('proVariantId', 'name')
-      .populate('addedBy', 'name shopName');
-
-    res.json({ success: true, message: "Products retrieved successfully.", data: products });
+    
+    // Pagination parameters
+    const page = parseInt(req.query.page) || 0;
+    const limit = parseInt(req.query.limit) || 0;
+    
+    let products;
+    let totalProducts = 0;
+    
+    if (page > 0 && limit > 0) {
+      // Paginated query
+      const skip = (page - 1) * limit;
+      totalProducts = await Product.countDocuments(filter);
+      products = await Product.find(filter)
+        .populate('proCategoryId', 'name')
+        .populate('proSubCategoryId', 'name')
+        .populate('proBrandId', 'name')
+        .populate('proVariantTypeId', 'type')
+        .populate('proVariantId', 'name')
+        .populate('addedBy', 'name shopName')
+        .sort({ _id: -1 })
+        .skip(skip)
+        .limit(limit);
+        
+      return res.json({ 
+        success: true, 
+        message: "Products retrieved successfully.", 
+        data: products,
+        pagination: {
+          totalProducts,
+          totalPages: Math.ceil(totalProducts / limit),
+          currentPage: page,
+          limit: limit
+        }
+      });
+    } else {
+      // Classic query (Backward compatible)
+      products = await Product.find(filter)
+        .populate('proCategoryId', 'name')
+        .populate('proSubCategoryId', 'name')
+        .populate('proBrandId', 'name')
+        .populate('proVariantTypeId', 'type')
+        .populate('proVariantId', 'name')
+        .populate('addedBy', 'name shopName')
+        .sort({ _id: -1 });
+        
+      return res.json({ success: true, message: "Products retrieved successfully.", data: products });
+    }
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });
   }
