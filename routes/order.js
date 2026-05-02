@@ -26,8 +26,8 @@ router.get('/', asyncHandler(async (req, res) => {
         }
 
         const orders = await Order.find(filter)
-        .populate('couponCode', 'id couponCode discountType discountAmount')
-        .populate('userID', 'id name').sort({ _id: -1 });
+            .populate('couponCode', 'id couponCode discountType discountAmount')
+            .populate('userID', 'id name').sort({ _id: -1 });
         res.json({ success: true, message: "Orders retrieved successfully.", data: orders });
     } catch (error) {
         res.status(500).json({ success: false, message: error.message });
@@ -54,8 +54,8 @@ router.get('/:id', asyncHandler(async (req, res) => {
     try {
         const orderID = req.params.id;
         const order = await Order.findById(orderID)
-        .populate('couponCode', 'id couponCode discountType discountAmount')
-        .populate('userID', 'id name');
+            .populate('couponCode', 'id couponCode discountType discountAmount')
+            .populate('userID', 'id name');
         if (!order) {
             return res.status(404).json({ success: false, message: "Order not found." });
         }
@@ -68,7 +68,7 @@ router.get('/:id', asyncHandler(async (req, res) => {
 // Create a new order
 router.post('/', asyncHandler(async (req, res) => {
     const { userID, orderStatus, items, totalPrice, shippingAddress, paymentMethod, couponCode, orderTotal, trackingUrl } = req.body;
-    
+
     // Server-side logging to debug missing fields
     console.log('--- Incoming Order Data ---');
     console.log('shippingAddress:', JSON.stringify(shippingAddress, null, 2));
@@ -82,9 +82,9 @@ router.post('/', asyncHandler(async (req, res) => {
         // Check if ordering is enabled
         const config = await AppConfig.findOne();
         if (config && config.isOrderingEnabled === false) {
-            return res.status(403).json({ 
-                success: false, 
-                message: config.orderBlockedMessage || "Ordering is temporarily disabled." 
+            return res.status(403).json({
+                success: false,
+                message: config.orderBlockedMessage || "Ordering is temporarily disabled."
             });
         }
         // Enrich items with vendorId and shopkeeperPrice from the database
@@ -107,18 +107,18 @@ router.post('/', asyncHandler(async (req, res) => {
             return item;
         }));
 
-        const order = new Order({ 
-            userID, 
-            orderStatus, 
-            items: enrichedItems, 
-            totalPrice, 
-            shippingAddress, 
-            paymentMethod, 
-            couponCode, 
-            orderTotal, 
-            trackingUrl 
+        const order = new Order({
+            userID,
+            orderStatus,
+            items: enrichedItems,
+            totalPrice,
+            shippingAddress,
+            paymentMethod,
+            couponCode,
+            orderTotal,
+            trackingUrl
         });
-        
+
         const newOrder = await order.save();
         console.log('--- Saved Order ---');
         console.log(JSON.stringify(newOrder, null, 2));
@@ -143,25 +143,25 @@ router.put('/cancel/:id', auth, asyncHandler(async (req, res) => {
         });
 
         if (!order) {
-            return res.status(404).json({ 
-                success: false, 
-                message: "Order not found or you don't have permission to cancel this order." 
+            return res.status(404).json({
+                success: false,
+                message: "Order not found or you don't have permission to cancel this order."
             });
         }
 
         // Check if order can be cancelled
         if (order.orderStatus === 'cancelled') {
-            return res.status(400).json({ 
-                success: false, 
-                message: "Order is already cancelled." 
+            return res.status(400).json({
+                success: false,
+                message: "Order is already cancelled."
             });
         }
 
         // Only delivered orders cannot be cancelled (pending, processing, and shipped can be cancelled)
         if (order.orderStatus === 'delivered') {
-            return res.status(400).json({ 
-                success: false, 
-                message: "Cannot cancel order. Order is already delivered." 
+            return res.status(400).json({
+                success: false,
+                message: "Cannot cancel order. Order is already delivered."
             });
         }
 
@@ -169,16 +169,16 @@ router.put('/cancel/:id', auth, asyncHandler(async (req, res) => {
         order.orderStatus = 'cancelled';
         await order.save();
 
-        res.json({ 
-            success: true, 
-            message: "Order cancelled successfully.", 
-            data: order 
+        res.json({
+            success: true,
+            message: "Order cancelled successfully.",
+            data: order
         });
     } catch (error) {
         if (error.name === 'CastError') {
-            return res.status(400).json({ 
-                success: false, 
-                message: "Invalid order ID." 
+            return res.status(400).json({
+                success: false,
+                message: "Invalid order ID."
             });
         }
         res.status(500).json({ success: false, message: error.message });
@@ -203,10 +203,10 @@ router.put('/bulk-update', asyncHandler(async (req, res) => {
             { $set: { orderStatus: newStatus } }
         );
 
-        res.json({ 
-            success: true, 
-            message: `${result.modifiedCount} orders updated successfully.`, 
-            data: result 
+        res.json({
+            success: true,
+            message: `${result.modifiedCount} orders updated successfully.`,
+            data: result
         });
     } catch (error) {
         res.status(500).json({ success: false, message: error.message });
