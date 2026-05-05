@@ -47,6 +47,11 @@ router.get('/', asyncHandler(async (req, res) => {
       filter.proSubCategoryId = req.query.proSubCategoryId;
     }
 
+    // 4. Search Filter
+    if (req.query.search) {
+      filter.name = { $regex: req.query.search, $options: 'i' };
+    }
+
     console.log('🔹 [GET PRODUCTS] Final Filter:', JSON.stringify(filter));
     
     // Pagination parameters
