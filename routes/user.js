@@ -236,9 +236,9 @@ router.post('/register-shopkeeper', asyncHandler(async (req, res) => {
     const { name, email, password, shopName, shopAddress, phoneNo } = req.body;
 
     if (!name || !email || !password || !shopName || !shopAddress) {
-        return res.status(400).json({ 
-            success: false, 
-            message: "Name, email, password, shop name, and shop address are required." 
+        return res.status(400).json({
+            success: false,
+            message: "Name, email, password, shop name, and shop address are required."
         });
     }
 
@@ -246,9 +246,9 @@ router.post('/register-shopkeeper', asyncHandler(async (req, res) => {
         // Check if user already exists
         const existingUser = await User.findOne({ email });
         if (existingUser) {
-            return res.status(400).json({ 
-                success: false, 
-                message: "A user with this email already exists." 
+            return res.status(400).json({
+                success: false,
+                message: "A user with this email already exists."
             });
         }
 
