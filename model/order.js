@@ -46,6 +46,11 @@ const orderSchema = new mongoose.Schema({
       },
       shopkeeperPrice: {
         type: Number
+      },
+      status: {
+        type: String,
+        enum: ['pending', 'processing', 'shipped', 'delivered', 'cancelled', 'accepted', 'rejected', 'packed'],
+        default: 'pending'
       }
     }
   ],

@@ -174,4 +174,56 @@ router.get('/vendor-orders-list', auth, isShopkeeper, asyncHandler(async (req, r
     }
 }));
 
+// Update the status of a specific item in an order (Shopkeeper independent status)
+router.put('/update-item-status', auth, isShopkeeper, asyncHandler(async (req, res) => {
+    const { orderId, productId, itemStatus } = req.body;
+    const shopkeeperId = req.user._id;
+
+    if (!orderId || !productId || !itemStatus) {
+        return res.status(400).json({ success: false, message: "orderId, productId, and itemStatus are required." });
+    }
+
+    try {
+        // Find the order
+        const order = await Order.findById(orderId);
+        if (!order) {
+            return res.status(404).json({ success: false, message: "Order not found." });
+        }
+
+        // Find the specific item belonging to this shopkeeper
+        const itemIndex = order.items.findIndex(item => 
+            item.productID.toString() === productId.toString() && 
+            item.vendorId && item.vendorId.toString() === shopkeeperId.toString()
+        );
+
+        if (itemIndex === -1) {
+            return res.status(403).json({ success: false, message: "Item not found in this order or you are not authorized to update it." });
+        }
+
+        // Update the item status
+        console.log(`[DEBUG] Updating item ${productId} status to ${itemStatus} in order ${orderId}`);
+        order.items[itemIndex].status = itemStatus;
+
+        // Global status update logic removed as per user request. 
+        // Only Admin can update the global orderStatus now.
+
+        await order.save();
+        console.log(`[DEBUG] Order saved with item-level update. Global status remains: ${order.orderStatus}`);
+
+        res.json({ 
+            success: true, 
+            message: "Item status updated successfully.", 
+            data: {
+                orderId: order._id,
+                productId: productId,
+                newItemStatus: itemStatus,
+                globalOrderStatus: order.orderStatus
+            } 
+        });
+    } catch (error) {
+        console.error('Error updating item status:', error);
+        res.status(500).json({ success: false, message: error.message });
+    }
+}));
+
 module.exports = router;

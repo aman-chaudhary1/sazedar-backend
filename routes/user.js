@@ -684,6 +684,40 @@ router.post('/reset-password', asyncHandler(async (req, res) => {
     }
 }));
 
+// Direct Reset Password (No OTP - Simple version as requested)
+router.post('/direct-reset-password', asyncHandler(async (req, res) => {
+    const { email, newPassword } = req.body;
+
+    if (!email || !newPassword) {
+        return res.status(400).json({ success: false, message: "Email and new password are required." });
+    }
+
+    if (newPassword.length < 6) {
+        return res.status(400).json({ success: false, message: "New password must be at least 6 characters long." });
+    }
+
+    try {
+        // Find user
+        const user = await User.findOne({ email });
+        if (!user) {
+            return res.status(404).json({ success: false, message: "User with this email not found." });
+        }
+
+        // Hash new password
+        const salt = await bcrypt.genSalt(10);
+        const hashedPassword = await bcrypt.hash(newPassword, salt);
+
+        // Update password
+        user.password = hashedPassword;
+        await user.save();
+
+        res.json({ success: true, message: "Password updated successfully. You can now login." });
+
+    } catch (error) {
+        res.status(500).json({ success: false, message: error.message });
+    }
+}));
+
 // Update a user by ID (for admin use)
 router.put('/:id', auth, isAdmin, asyncHandler(async (req, res) => {
     try {
