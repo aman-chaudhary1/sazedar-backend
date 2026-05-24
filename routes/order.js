@@ -49,6 +49,74 @@ router.get('/orderByUserId/:userId', asyncHandler(async (req, res) => {
 }));
 
 
+// Get pending orders clustered by requested Panchayat sector
+router.get('/by-panchayat', asyncHandler(async (req, res) => {
+    try {
+        const { panchayat } = req.query;
+        if (!panchayat) {
+            return res.status(400).json({ success: false, message: "Panchayat sector parameter is required." });
+        }
+
+        const orders = await Order.find({
+            'shippingAddress.panchayat': panchayat,
+            orderStatus: { $in: ['pending', 'processing', 'assigned_to_delivery_boy', 'out_for_delivery'] }
+        }).populate('userID', 'name phoneNo email').sort({ orderDate: -1 });
+
+        res.json({ success: true, message: "Sector orders extracted successfully.", data: orders });
+    } catch (error) {
+        res.status(500).json({ success: false, message: error.message });
+    }
+}));
+
+// Admin endpoint: Assign multiple clustered order packets to a specific delivery candidate
+router.put('/assign-partner', asyncHandler(async (req, res) => {
+    try {
+        const { orderIds, deliveryBoyId, deliveryFee } = req.body;
+
+        if (!orderIds || !Array.isArray(orderIds) || orderIds.length === 0) {
+            return res.status(400).json({ success: false, message: "Array of target orderIds is required." });
+        }
+        if (!deliveryBoyId) {
+            return res.status(400).json({ success: false, message: "Target Delivery Partner ID is required." });
+        }
+
+        // Validate partner state flag to prevent dead routes
+        const partner = await User.findById(deliveryBoyId);
+        if (!partner || partner.role !== 'delivery_boy') {
+            return res.status(404).json({ success: false, message: "Valid Delivery Partner record not found." });
+        }
+
+        if (partner.onlineStatus === 'offline') {
+            return res.status(400).json({ 
+                success: false, 
+                message: "Assignment blocked: Candidate device currently flagged as offline." 
+            });
+        }
+
+        const feeToAssign = Number(deliveryFee) || 20;
+
+        const result = await Order.updateMany(
+            { _id: { $in: orderIds } },
+            { 
+                $set: { 
+                    deliveryBoyId: deliveryBoyId,
+                    deliveryPartnerFee: feeToAssign,
+                    orderStatus: 'assigned_to_delivery_boy'
+                } 
+            }
+        );
+
+        res.json({
+            success: true,
+            message: `Successfully mapped ${result.modifiedCount} order packages to partner ${partner.name}.`,
+            data: result
+        });
+    } catch (error) {
+        res.status(500).json({ success: false, message: error.message });
+    }
+}));
+
+
 // Get an order by ID
 router.get('/:id', asyncHandler(async (req, res) => {
     try {
@@ -107,16 +175,20 @@ router.post('/', asyncHandler(async (req, res) => {
             return item;
         }));
 
+        // Generate randomized secure 4-digit delivery verification OTP
+        const generatedOtp = Math.floor(1000 + Math.random() * 9000).toString();
+
         const order = new Order({
             userID,
-            orderStatus,
+            orderStatus: orderStatus || 'assigned_to_delivery_boy',
             items: enrichedItems,
             totalPrice,
             shippingAddress,
             paymentMethod,
             couponCode,
             orderTotal,
-            trackingUrl
+            trackingUrl,
+            deliveryOtp: generatedOtp
         });
 
         const newOrder = await order.save();
@@ -251,5 +323,6 @@ router.delete('/:id', asyncHandler(async (req, res) => {
         res.status(500).json({ success: false, message: error.message });
     }
 }));
+
 
 module.exports = router;

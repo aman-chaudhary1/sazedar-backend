@@ -32,7 +32,7 @@ const userSchema = new mongoose.Schema({
   },
   role: {
     type: String,
-    enum: ['admin', 'shopkeeper', 'user'],
+    enum: ['admin', 'shopkeeper', 'user', 'delivery_boy'],
     default: 'user'
   },
   // Shopkeeper specific fields
@@ -61,6 +61,35 @@ const userSchema = new mongoose.Schema({
     type: String,
     enum: ['active', 'inactive'],
     default: 'active'
+  },
+  // Delivery Partner specific fields
+  accountApprovalStatus: {
+    type: String,
+    enum: ['under_review', 'approved', 'rejected', 'blocked'],
+    default: 'under_review'
+  },
+  onlineStatus: {
+    type: String,
+    enum: ['online', 'offline'],
+    default: 'offline'
+  },
+  vehicleType: {
+    type: String,
+    default: 'Motorcycle'
+  },
+  requestedPanchayats: [{
+    type: String
+  }],
+  assignedPanchayats: [{
+    type: String
+  }],
+  villagesExperience: {
+    type: String,
+    default: null
+  },
+  totalEarnings: {
+    type: Number,
+    default: 0
   },
   createdAt: {
     type: Date,

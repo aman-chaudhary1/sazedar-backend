@@ -722,7 +722,12 @@ router.post('/direct-reset-password', asyncHandler(async (req, res) => {
 router.put('/:id', auth, isAdmin, asyncHandler(async (req, res) => {
     try {
         const userID = req.params.id;
-        const { name, email, phoneNo, userStatus, shopStatus, role, assignedCategories, assignedSubCategories } = req.body;
+        const { 
+            name, email, phoneNo, userStatus, shopStatus, role, 
+            assignedCategories, assignedSubCategories,
+            // Delivery boy specific fields
+            accountApprovalStatus, assignedPanchayats, onlineStatus
+        } = req.body;
         const user = await User.findById(userID);
 
         if (!user) {
@@ -737,6 +742,11 @@ router.put('/:id', auth, isAdmin, asyncHandler(async (req, res) => {
         if (shopStatus) user.shopStatus = shopStatus;
         if (assignedCategories) user.assignedCategories = assignedCategories;
         if (assignedSubCategories) user.assignedSubCategories = assignedSubCategories;
+
+        // Delivery boy logistics fields
+        if (accountApprovalStatus) user.accountApprovalStatus = accountApprovalStatus;
+        if (assignedPanchayats !== undefined) user.assignedPanchayats = assignedPanchayats;
+        if (onlineStatus) user.onlineStatus = onlineStatus;
 
         await user.save();
         res.json({ success: true, message: "User updated successfully.", data: user });

@@ -12,7 +12,7 @@ const orderSchema = new mongoose.Schema({
   },
   orderStatus: {
     type: String,
-    enum: ['pending', 'processing', 'shipped', 'delivered', 'cancelled', 'accepted', 'rejected', 'packed'],
+    enum: ['pending', 'processing', 'shipped', 'delivered', 'cancelled', 'accepted', 'rejected', 'packed', 'assigned_to_delivery_boy', 'out_for_delivery'],
     default: 'pending'
   },
   items: [
@@ -49,7 +49,7 @@ const orderSchema = new mongoose.Schema({
       },
       status: {
         type: String,
-        enum: ['pending', 'processing', 'shipped', 'delivered', 'cancelled', 'accepted', 'rejected', 'packed'],
+        enum: ['pending', 'processing', 'shipped', 'delivered', 'cancelled', 'accepted', 'rejected', 'packed', 'assigned_to_delivery_boy', 'out_for_delivery'],
         default: 'pending'
       }
     }
@@ -89,6 +89,20 @@ const orderSchema = new mongoose.Schema({
   },
   trackingUrl: {
     type: String
+  },
+  // Delivery assignment details
+  deliveryBoyId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'User',
+    default: null
+  },
+  deliveryOtp: {
+    type: String,
+    default: null
+  },
+  deliveryPartnerFee: {
+    type: Number,
+    default: 20
   },
 });
 

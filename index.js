@@ -131,6 +131,7 @@ app.use('/favorites', require('./routes/favorite'));
 app.use('/app-version', require('./routes/appVersion'));
 app.use('/app-config', require('./routes/appConfig'));
 app.use('/reviews', require('./routes/review'));
+app.use('/delivery-boy', require('./routes/deliveryBoy'));
 
 /* ======================
    HEALTH CHECK
